@@ -4,25 +4,26 @@ import cats._
 import cats.syntax.semigroup._
 import cats.syntax.functor._
 import cats.syntax.flatMap._
+import cats.syntax.applicativeError._
 
 // discussed by @l3h3r and @odomontois 31.01.2018 13:03
-/**Replacement for WriterT capable of keeping written value in case of error*/
+/** Replacement for WriterT capable of keeping written value in case of error */
 final case class ReliableWriterT[F[_], E, W, A](run: F[(W, Either[E, A])]) {
   def mapAll[W1, E1, A1](f: (W, Either[E, A]) => (W1, Either[E1, A1]))(implicit F: Functor[F]): ReliableWriterT[F, E1, W1, A1] =
     ReliableWriterT(F.map(run)(f.tupled))
 
   def map[B](f: A => B)(implicit F: Functor[F]): ReliableWriterT[F, E, W, B] = mapAll { case (w, ea) => (w, ea.map(f)) }
 
-  def flatMap[B](f: A => ReliableWriterT[F, E, W, B])(implicit W: Semigroup[W], F: Monad[F]): ReliableWriterT[F, E, W, B] =
+  def flatMap[B](f: A => ReliableWriterT[F, E, W, B])(implicit W: Semigroup[W], F: MonadError[F, E]): ReliableWriterT[F, E, W, B] =
     ReliableWriterT(run.flatMap {
       case (w, Left(e)) => F.pure((w, Left(e)))
-      case (w1, Right(x)) => f(x).run.map { case (w2, eb) => (w1 |+| w2, eb) }
+      case (w1, Right(x)) => f(x).run.map { case (w2, eb) => (w1 |+| w2, eb) }.handleError(e => (w1, Left(e)))
     })
 
-  def handleWith(f: E => ReliableWriterT[F, E, W, A])(implicit W: Semigroup[W], F: Monad[F]): ReliableWriterT[F, E, W, A] =
+  def handleWith(f: E => ReliableWriterT[F, E, W, A])(implicit W: Semigroup[W], F: MonadError[F, E]): ReliableWriterT[F, E, W, A] =
     ReliableWriterT(run.flatMap {
       case (w, Right(x)) => F.pure((w, Right(x)))
-      case (w1, Left(e)) => f(e).run.map { case (w2, eb) => (w1 |+| w2, eb) }
+      case (w1, Left(e)) => f(e).run.map { case (w2, eb) => (w1 |+| w2, eb) }.handleError(e => (w1, Left(e)))
     })
 }
 
@@ -38,7 +39,7 @@ object ReliableWriterT {
             case (w2, Left(e)) => Right((w1 |+| w2, Left(e)))
             case (w2, Right(Left(a1))) => Left((w1 |+| w2, a1))
             case (w2, Right(Right(b))) => Right((w1 |+| w2, Right(b)))
-          }
+          }.handleError(e => Right((w1, Left(e))))
         })
       override def raiseError[A](e: E): ReliableWriterT[F, E, W, A] = ReliableWriterT(F.pure((W.empty, Left(e))))
       override def handleErrorWith[A](fa: ReliableWriterT[F, E, W, A])(f: E => ReliableWriterT[F, E, W, A]): ReliableWriterT[F, E, W, A] =
