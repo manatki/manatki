@@ -14,6 +14,17 @@ import scala.concurrent.duration._
 import scala.util.Random
 
 object SyncByKeyChecks {
+  def main(args: Array[String]): Unit = {
+    val mode: SyncMode[String] = if (args.lift(0).contains("unsync")) unsynchonized else synchonized
+
+    val system = ActorSystem(
+      SyncByKeyChecks.Guard.actor[String](Seq("lol", "kek", "cheburek"), mode),
+      "checker")
+
+    Await.ready(system.whenTerminated, Duration.Inf)
+    println("done")
+  }
+
   sealed trait Memo
 
   type SyncMode[K] = SyncByKey[K] => K => Task ~> Task
@@ -113,16 +124,7 @@ object SyncByKeyChecks {
     }
   }
 
-  def main(args: Array[String]): Unit = {
-    val mode: SyncMode[String] = if (args.lift(0).contains("unsync")) unsynchonized else synchonized
 
-    val system = ActorSystem(
-      SyncByKeyChecks.Guard.actor[String](Seq("lol", "kek", "cheburek"), mode),
-      "checker")
-
-    Await.ready(system.whenTerminated, Duration.Inf)
-    println("done")
-  }
 }
 
 
