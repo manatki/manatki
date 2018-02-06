@@ -1,4 +1,4 @@
-package manatki.akka
+package manatki.akkas
 
 import akka.http.scaladsl.model.{MediaType, MediaTypes}
 import akka.http.scaladsl.model.headers.Accept
