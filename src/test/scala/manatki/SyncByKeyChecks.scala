@@ -84,10 +84,7 @@ object SyncByKeyChecks {
       }
 
       def waitAttackers(remains: Long): Behavior[Guard[K]] = Actor.immutable[Guard[K]] {
-        case (_, Done()) => if (remains == 1) {
-          ctx.system.terminate()
-          stopMemos
-        } else waitAttackers(remains - 1)
+        case (_, Done()) => if (remains == 1) stopMemos else waitAttackers(remains - 1)
         case (_, Error(key, num, prev)) =>
           println(s"sync error [$key] $num vs $prev")
           Actor.same
