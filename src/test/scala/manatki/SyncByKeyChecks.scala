@@ -1,5 +1,6 @@
 package manatki
 
+import akka.actor.Scheduler
 import akka.actor.typed.scaladsl.Actor
 import akka.actor.typed.scaladsl.AskPattern._
 import akka.actor.typed.{ActorRef, ActorSystem, Behavior, Terminated}
@@ -53,9 +54,9 @@ object SyncByKeyChecks {
                   key: K,
                   count: Long,
                   parent: ActorRef[Guard[K]]
-                 ) =
+                 ): Behavior[Void] =
     Actor.deferred[Void] { ctx =>
-      implicit val sched = ctx.system.scheduler
+      implicit val sched: Scheduler = ctx.system.scheduler
 
       for (_ <- 1L to count) {
         sync(Task.deferFuture {
@@ -70,7 +71,7 @@ object SyncByKeyChecks {
       Actor.stopped
     }
 
-  trait Guard[K]
+  sealed trait Guard[K]
 
   object Guard {
     final case class Done[K]() extends Guard[K]
@@ -81,7 +82,7 @@ object SyncByKeyChecks {
                  syncMode: SyncMode[K],
                  attackersByKey: Int = 10,
                  count: Long = 1000,
-                ) = Actor.deferred[Guard[K]] { ctx =>
+                ): Behavior[Guard[K]] = Actor.deferred[Guard[K]] { ctx =>
 
 
       val keyList = keys.toList
