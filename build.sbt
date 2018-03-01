@@ -13,9 +13,16 @@ val monixVersion = "3.0.0-M3"
 val akkaVersion = "2.5.9"
 val akkaHttpVersion = "10.0.11"
 
+val fs2Version = "0.10.1"
+
+val scalaTestVersion = "3.0.5"
+val scalaCheckVersion = "1.13.4"
+
 val akkas =
   (Seq("actor", "actor-typed", "stream").map(_ -> akkaVersion) :+ ("http" -> akkaHttpVersion))
     .map { case (module, libVersion) => "com.typesafe.akka" %% s"akka-$module" % libVersion }
+
+
 
 libraryDependencies += "org.typelevel" %% "cats-core" % catsVersion
 libraryDependencies += "org.typelevel" %% "cats-free" % catsVersion
@@ -43,7 +50,16 @@ scalacOptions ++= Seq(
 addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.3")
 addCompilerPlugin("org.scalameta" % "paradise" % "3.0.0-M11" cross CrossVersion.patch)
 
+val testSettings = Seq(
+  libraryDependencies += "org.scalatest" %% "scalatest" % scalaTestVersion  % "test",
+  libraryDependencies += "org.scalacheck" %% "scalacheck" % scalaCheckVersion  % "test"
+)
+
 lazy val akka = project.settings(libraryDependencies ++= akkas)
+
+lazy val fsfs = project
+  .settings(libraryDependencies += "co.fs2" %% "fs2-core" % fs2Version)
+  .settings(testSettings)
 
 libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.4" % "test"
 libraryDependencies ++= akkas.map(_ % "test")
