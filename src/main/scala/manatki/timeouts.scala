@@ -8,6 +8,8 @@ import cats.syntax.functor._
 import scala.concurrent.duration.FiniteDuration
 
 object timeouts {
+  // requested by @pomadchin 14.05.2018 12:32:35
+  // initially discussed with Юрий Бадальянц 08.05.2018 18:31:25
   implicit class TimeoutSyntax[F[_], A](val fa: F[A]) extends AnyVal {
     def timeoutOr[B](after: FiniteDuration)(x: => F[B])(implicit conc: Concurrent[F], timer: Timer[F]): F[Either[B, A]] =
       timer.sleep(after).productREval(Eval.later(x)).race(fa)
