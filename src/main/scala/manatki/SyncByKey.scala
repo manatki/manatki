@@ -3,7 +3,7 @@ package manatki
 import cats.arrow.FunctionK
 import cats.~>
 import monix.eval.{Coeval, MVar, Task, TaskSemaphore}
-
+import cats.data.OptionT
 
 //discussed with Kirill Shelopugin 2018-02-06 19:18
 /** Synchronizes multiple tasks, sequencing actions for single key */
@@ -17,19 +17,23 @@ sealed abstract class SyncByKey[K] {
 
 object SyncByKey {
   /** creates growable synchronize map */
-  def apply[K](): SyncByKey[K] = new SyncByKey[K] {
-    private val syncsVar = MVar(Map.empty[K, TaskSemaphore])
-
-    protected def syncForKey(key: K): Task[TaskSemaphore] = for {
-      syncs <- syncsVar.take
-      sync = syncs.getOrElse(key, TaskSemaphore(1))
-      _ <- syncsVar.put(syncs + (key -> sync))
-    } yield sync
-  }
+  def apply[K](): Task[SyncByKey[K]] =
+    for (syncsVar <- MVar(Map.empty[K, TaskSemaphore]))
+      yield new SyncByKey[K] {
+        protected def syncForKey(key: K): Task[TaskSemaphore] = for {
+          syncs <- syncsVar.take
+          sync <- OptionT.fromOption[Task](syncs.get(key)).getOrElseF(TaskSemaphore(1))
+          _ <- syncsVar.put(syncs + (key -> sync))
+        } yield sync
+      }
 
   /** creates synchronize map with fixed key set */
-  def apply[K](keys: TraversableOnce[K]): SyncByKey[K] = new SyncByKey[K] {
-    val syncs = keys.toIterator.map(_ -> TaskSemaphore(1)).toMap
-    protected def syncForKey(key: K): Task[TaskSemaphore] = Task.eval(syncs(key))
-  }
+  def apply[K](keys: TraversableOnce[K]): Task[SyncByKey[K]] =
+    for (syncs <- Task.traverse(keys)(i => TaskSemaphore(1).map(i -> _)))
+      yield {
+        val syncMap = syncs.toMap
+        new SyncByKey[K] {
+          protected def syncForKey(key: K): Task[TaskSemaphore] = Task.eval(syncMap(key))
+        }
+      }
 }

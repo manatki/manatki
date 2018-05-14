@@ -5,13 +5,13 @@ version := "0.1"
 scalaOrganization := "org.typelevel"
 scalaVersion := "2.12.4-bin-typelevel-4"
 
-val catsVersion = "1.0.1"
-val catsEffectVersion = "0.5"
+val catsVersion = "1.1.0"
+val catsEffectVersion = "0.10"
 val catsMtlVersion = "0.2.1"
-val monixVersion = "3.0.0-M3"
+val monixVersion = "3.0.0-RC1"
 
-val akkaVersion = "2.5.9"
-val akkaHttpVersion = "10.0.11"
+val akkaVersion = "2.5.11"
+val akkaHttpVersion = "10.1.1"
 
 val fs2Version = "0.10.1"
 

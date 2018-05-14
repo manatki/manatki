@@ -1,13 +1,14 @@
 package manatki
 
 import akka.actor.Scheduler
-import akka.actor.typed.scaladsl.Actor
+import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.scaladsl.AskPattern._
 import akka.actor.typed.{ActorRef, ActorSystem, Behavior, Terminated}
 import akka.util.Timeout
 import cats.arrow.FunctionK
 import cats.~>
 import monix.eval.Task
+import monix.execution
 import monix.execution.Scheduler.Implicits.global
 
 import scala.concurrent.Await
@@ -39,23 +40,22 @@ object SyncByKeyChecks {
     final case class Current(resp: ActorRef[Option[Int]]) extends Memo
     final case class Stop() extends Memo
 
-    def actor(current: Option[Int] = None): Behavior[Memo] = Actor.immutable[Memo] {
+    def actor(current: Option[Int] = None): Behavior[Memo] = Behaviors.immutable[Memo] {
       case (_, Store(x)) => actor(Some(x))
       case (_, Current(resp)) =>
         resp ! current
-        Actor.same
-      case (_, Stop()) => Actor.stopped
+        Behaviors.same
+      case (_, Stop()) => Behaviors.stopped
     }
   }
 
-
   def attacker[K](sync: Task ~> Task,
-                  memo: ActorRef[Memo],
-                  key: K,
-                  count: Long,
-                  parent: ActorRef[Guard[K]]
-                 ): Behavior[Void] =
-    Actor.deferred[Void] { ctx =>
+    memo              : ActorRef[Memo],
+    key               : K,
+    count             : Long,
+    parent            : ActorRef[Guard[K]]
+  ): Behavior[Void] =
+    Behaviors.setup[Void] { ctx =>
       implicit val sched: Scheduler = ctx.system.scheduler
 
       for (_ <- 1L to count) {
@@ -68,7 +68,7 @@ object SyncByKeyChecks {
         }
       }
 
-      Actor.stopped
+      Behaviors.stopped
     }
 
   sealed trait Guard[K]
@@ -77,45 +77,45 @@ object SyncByKeyChecks {
     final case class Done[K]() extends Guard[K]
     final case class Error[K](key: K, number: Int, memo: Option[Int]) extends Guard[K]
 
-
     def actor[K](keys: TraversableOnce[K],
-                 syncMode: SyncMode[K],
-                 attackersByKey: Int = 10,
-                 count: Long = 1000,
-                ): Behavior[Guard[K]] = Actor.deferred[Guard[K]] { ctx =>
-
+      syncMode       : SyncMode[K],
+      attackersByKey : Int = 10,
+      count          : Long = 1000L,
+    ): Behavior[Guard[K]] = Behaviors.setup[Guard[K]] { ctx =>
 
       val keyList = keys.toList
-      val sync = SyncByKey(keyList)
+      val syncTask = SyncByKey(keyList)
 
       val memos = keyList.map(k => k -> ctx.spawnAnonymous(Memo.actor()))
-      val attackers = memos.flatMap { case (k, m) =>
-        List.fill(attackersByKey)(
-          ctx.watch(ctx.spawnAnonymous(
-            attacker[K](syncMode(sync)(k), m, k, count, ctx.self))))
+      val attackers = syncTask.foreach { sync =>
+        memos.flatMap { case (k, m) =>
+          List.fill(attackersByKey)(
+            ctx.watch(ctx.spawnAnonymous(
+              attacker[K](syncMode(sync)(k), m, k, count, ctx.self))))
+        }
       }
 
-      def waitAttackers(remains: Long): Behavior[Guard[K]] = Actor.immutable[Guard[K]] {
+      def waitAttackers(remains: Long): Behavior[Guard[K]] = Behaviors.immutable[Guard[K]] {
         case (_, Done()) => if (remains == 1) stopMemos else waitAttackers(remains - 1)
         case (_, Error(key, num, prev)) =>
           println(s"sync error [$key] $num vs $prev")
-          Actor.same
+          Behaviors.same
       } onSignal {
         case (_, _: Terminated) =>
           ctx.self ! Done()
-          Actor.same
+          Behaviors.same
       }
 
-      def stopMemos: Behavior[Guard[K]] = Actor.deferred { ctx =>
+      def stopMemos: Behavior[Guard[K]] = Behaviors.setup { ctx =>
         for ((_, m) <- memos) {
           ctx.watch(m)
           m ! Memo.Stop()
         }
 
-        def stopping(remains: Int): Behavior[Guard[K]] = Actor.onSignal {
+        def stopping(remains: Int): Behavior[Guard[K]] = Behaviors.onSignal {
           case (_, _: Terminated) =>
             ctx.self ! Done()
-            if (remains == 1) Actor.stopped else stopping(remains - 1)
+            if (remains == 1) Behaviors.stopped else stopping(remains - 1)
         }
 
         stopping(memos.size)
@@ -124,7 +124,6 @@ object SyncByKeyChecks {
       waitAttackers(1L * keyList.size * attackersByKey)
     }
   }
-
 
 }
 
