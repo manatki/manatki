@@ -23,8 +23,8 @@ object Cont {
   type State[R, S, A] = Cont[S => Eval[(R, S)], A]
 
   implicit class ResettableOps[R](val c: Cont[R, R]) extends AnyVal {
-    def reset: Eval[R] = c.run(identity)
-    def resetS: R = c.runS(identity)
+    def reset: Eval[R] = Cont.reset(c)
+    def resetS: R = Cont.resetS(c)
   }
 
   def apply[R, A](f: (A => R) => R): Cont[R, A] = (g => f(g)): ContS[R, A]
@@ -45,8 +45,11 @@ object Cont {
   def put[S, R](s: S): State[R, S, Unit] = state(_ => ((), s))
 
 
-  def shift[A, R](f: (Eval[A] => Eval[R]) => Cont[R, R]): Cont[R, A] = k => f(k).reset
-  def shiftS[A, R](f: (A => R) => Cont[R, R]): ContS[R, A] = k => f(k).resetS
+  def shift[A, R](f: (Eval[A] => Eval[R]) => Cont[R, R]): Cont[R, A] = k => reset(f(k))
+  def shiftS[A, R](f: (A => R) => Cont[R, R]): ContS[R, A] = k => resetS(f(k))
+
+  def reset[R](c: Cont[R, R]): Eval[R] = c.run(identity)
+  def resetS[R](c: Cont[R, R]): R = c.runS(identity)
 
   /** list effect constructor */
   def foldable[F[_] : Foldable, R: Monoid, A](x: F[A]): Cont[R, A] =
