@@ -1,19 +1,12 @@
-package manatki
+package manatki.cont
 
-import cats.{Eval, Monoid}
-import cats.syntax.foldable._
-import cats.syntax.monoid._
-import alleycats.std.iterable._
-import manatki.Cont
+import cats.Eval.later
+import cats.Monoid
+import cats.instances.function._
+import cats.instances.list._
+import cats.syntax.traverse._
 import cats.syntax.flatMap._
 import cats.syntax.functor._
-import cats.Eval.{later, now}
-import cats.instances.list._
-import Monoid.empty
-import cats.syntax.eq._
-import cats.syntax.traverse._
-import cats.instances.int._
-import cats.instances.function._
 import org.scalatest.FlatSpec
 
 class ContSuite extends FlatSpec {
