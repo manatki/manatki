@@ -17,7 +17,8 @@ import scala.util.Random
 
 object SyncByKeyChecks {
   def main(args: Array[String]): Unit = {
-    val mode: SyncMode[String] = if (args.lift(0).contains("unsync")) unsynchonized else synchonized
+    val mode: SyncMode[String] =
+      if (args.lift(0).contains("unsync")) unsynchonized else synchonized
 
     val system = ActorSystem(
       SyncByKeyChecks.Guard.actor[String](Seq("lol", "kek", "cheburek"), mode),
@@ -40,21 +41,21 @@ object SyncByKeyChecks {
     final case class Current(resp: ActorRef[Option[Int]]) extends Memo
     final case class Stop() extends Memo
 
-    def actor(current: Option[Int] = None): Behavior[Memo] = Behaviors.immutable[Memo] {
-      case (_, Store(x)) => actor(Some(x))
-      case (_, Current(resp)) =>
-        resp ! current
-        Behaviors.same
-      case (_, Stop()) => Behaviors.stopped
-    }
+    def actor(current: Option[Int] = None): Behavior[Memo] =
+      Behaviors.receive[Memo] {
+        case (_, Store(x)) => actor(Some(x))
+        case (_, Current(resp)) =>
+          resp ! current
+          Behaviors.same
+        case (_, Stop()) => Behaviors.stopped
+      }
   }
 
   def attacker[K](sync: Task ~> Task,
-    memo              : ActorRef[Memo],
-    key               : K,
-    count             : Long,
-    parent            : ActorRef[Guard[K]]
-  ): Behavior[Void] =
+                  memo: ActorRef[Memo],
+                  key: K,
+                  count: Long,
+                  parent: ActorRef[Guard[K]]): Behavior[Void] =
     Behaviors.setup[Void] { ctx =>
       implicit val sched: Scheduler = ctx.system.scheduler
 
@@ -63,8 +64,10 @@ object SyncByKeyChecks {
           val number = Random.nextInt()
           memo ! Memo.Store(number)
           memo ? Memo.Current map ((_, number))
-        }).foreach { case (answer, number) =>
-          if (!answer.contains(number)) parent ! Guard.Error(key, number, answer)
+        }).foreach {
+          case (answer, number) =>
+            if (!answer.contains(number))
+              parent ! Guard.Error(key, number, answer)
         }
       }
 
@@ -75,36 +78,39 @@ object SyncByKeyChecks {
 
   object Guard {
     final case class Done[K]() extends Guard[K]
-    final case class Error[K](key: K, number: Int, memo: Option[Int]) extends Guard[K]
+    final case class Error[K](key: K, number: Int, memo: Option[Int])
+        extends Guard[K]
 
     def actor[K](keys: TraversableOnce[K],
-      syncMode       : SyncMode[K],
-      attackersByKey : Int = 10,
-      count          : Long = 1000L,
+                 syncMode: SyncMode[K],
+                 attackersByKey: Int = 10,
+                 count: Long = 1000L,
     ): Behavior[Guard[K]] = Behaviors.setup[Guard[K]] { ctx =>
-
       val keyList = keys.toList
       val syncTask = SyncByKey(keyList)
 
       val memos = keyList.map(k => k -> ctx.spawnAnonymous(Memo.actor()))
       val attackers = syncTask.foreach { sync =>
-        memos.flatMap { case (k, m) =>
-          List.fill(attackersByKey)(
-            ctx.watch(ctx.spawnAnonymous(
-              attacker[K](syncMode(sync)(k), m, k, count, ctx.self))))
+        memos.flatMap {
+          case (k, m) =>
+            List.fill(attackersByKey)(
+              ctx.watch(ctx.spawnAnonymous(
+                attacker[K](syncMode(sync)(k), m, k, count, ctx.self))))
         }
       }
 
-      def waitAttackers(remains: Long): Behavior[Guard[K]] = Behaviors.immutable[Guard[K]] {
-        case (_, Done()) => if (remains == 1) stopMemos else waitAttackers(remains - 1)
-        case (_, Error(key, num, prev)) =>
-          println(s"sync error [$key] $num vs $prev")
-          Behaviors.same
-      } onSignal {
-        case (_, _: Terminated) =>
-          ctx.self ! Done()
-          Behaviors.same
-      }
+      def waitAttackers(remains: Long): Behavior[Guard[K]] =
+        Behaviors.receiveMessage[Guard[K]] {
+          case Done() =>
+            if (remains == 1) stopMemos else waitAttackers(remains - 1)
+          case Error(key, num, prev) =>
+            println(s"sync error [$key] $num vs $prev")
+            Behaviors.same
+        } receiveSignal {
+          case (_, _: Terminated) =>
+            ctx.self ! Done()
+            Behaviors.same
+        }
 
       def stopMemos: Behavior[Guard[K]] = Behaviors.setup { ctx =>
         for ((_, m) <- memos) {
@@ -112,7 +118,7 @@ object SyncByKeyChecks {
           m ! Memo.Stop()
         }
 
-        def stopping(remains: Int): Behavior[Guard[K]] = Behaviors.onSignal {
+        def stopping(remains: Int): Behavior[Guard[K]] = Behaviors.receiveSignal {
           case (_, _: Terminated) =>
             ctx.self ! Done()
             if (remains == 1) Behaviors.stopped else stopping(remains - 1)
@@ -126,5 +132,3 @@ object SyncByKeyChecks {
   }
 
 }
-
-
