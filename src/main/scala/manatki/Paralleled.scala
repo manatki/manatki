@@ -111,6 +111,6 @@ trait SplittingConversion {
 
 object paralleledConversion extends SplittingConversion {
   implicit def convertParalleledToCats[F[_]](
-      implicit paralleled: Paralleled[F]): NonEmptyParallel[F, paralleled.Par] =
+      implicit paralleled: Paralleled[F]): Parallel[F, paralleled.Par] =
     paralleled.toCats
 }
