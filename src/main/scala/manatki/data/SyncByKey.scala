@@ -1,9 +1,8 @@
-package manatki
+package manatki.data
 
-import cats.arrow.FunctionK
-import cats.~>
-import monix.eval.{Coeval, MVar, Task, TaskSemaphore}
 import cats.data.OptionT
+import cats.~>
+import monix.eval.{MVar, Task, TaskSemaphore}
 
 //discussed with Kirill Shelopugin 2018-02-06 19:18
 /** Synchronizes multiple tasks, sequencing actions for single key */

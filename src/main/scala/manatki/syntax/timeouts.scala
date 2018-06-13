@@ -1,4 +1,5 @@
-package manatki
+package manatki.syntax
+
 import cats.effect.{Concurrent, Timer}
 import Concurrent.ops._
 import cats.Eval

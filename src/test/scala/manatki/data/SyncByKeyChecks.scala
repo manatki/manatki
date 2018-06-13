@@ -1,14 +1,13 @@
-package manatki
+package manatki.data
 
 import akka.actor.Scheduler
-import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.scaladsl.AskPattern._
+import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, ActorSystem, Behavior, Terminated}
 import akka.util.Timeout
 import cats.arrow.FunctionK
 import cats.~>
 import monix.eval.Task
-import monix.execution
 import monix.execution.Scheduler.Implicits.global
 
 import scala.concurrent.Await

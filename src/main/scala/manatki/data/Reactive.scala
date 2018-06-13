@@ -1,4 +1,4 @@
-package manatki
+package manatki.data
 
 import cats.arrow.{Compose, Profunctor}
 import cats.data.Kleisli

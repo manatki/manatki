@@ -1,4 +1,4 @@
-package manatki.cont
+package manatki.data.cont
 
 import cats.Eval.later
 import cats.Monoid

@@ -1,7 +1,8 @@
-package manatki
-import cats.effect.{Async, Concurrent, ConcurrentEffect}
-import cats.syntax.flatMap._
+package manatki.syntax
+
+import cats.effect.{Async, Concurrent}
 import cats.syntax.apply._
+import cats.syntax.flatMap._
 
 import scala.concurrent.ExecutionContext
 

@@ -1,4 +1,4 @@
-package manatki.cont
+package manatki.data.cont
 
 import cats.Eval.now
 import cats.effect.{IO, Sync}

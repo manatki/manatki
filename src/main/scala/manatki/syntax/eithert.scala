@@ -1,4 +1,4 @@
-package manatki
+package manatki.syntax
 
 import cats.ApplicativeError
 import cats.data.EitherT

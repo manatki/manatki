@@ -1,4 +1,4 @@
-package manatki.cont
+package manatki.data.cont
 
 import alleycats.std.iterable._
 import cats.Eval.{later, now}

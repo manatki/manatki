@@ -1,4 +1,4 @@
-package manatki
+package manatki.data
 
 import cats.data.StateT
 import cats.effect._

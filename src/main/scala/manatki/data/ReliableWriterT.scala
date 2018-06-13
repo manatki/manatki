@@ -1,10 +1,10 @@
-package manatki
+package manatki.data
 
 import cats._
-import cats.syntax.semigroup._
-import cats.syntax.functor._
-import cats.syntax.flatMap._
 import cats.syntax.applicativeError._
+import cats.syntax.flatMap._
+import cats.syntax.functor._
+import cats.syntax.semigroup._
 
 // discussed by @l3h3r and @odomontois 31.01.2018 13:03
 /** Replacement for WriterT capable of keeping written value in case of error */

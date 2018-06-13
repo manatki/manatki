@@ -1,7 +1,7 @@
-package manatki
+package manatki.syntax
+
 import cats.FlatMap
 import cats.data.IndexedStateT
-import cats.syntax.profunctor._
 
 object indexedState {
   implicit class StateTOps[F[_], SA, SB, A](val state: IndexedStateT[F, SA, SB, A]) extends AnyVal {

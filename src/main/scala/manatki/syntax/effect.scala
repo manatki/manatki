@@ -1,4 +1,4 @@
-package manatki
+package manatki.syntax
 
 import cats.effect.{Effect, IO}
 
