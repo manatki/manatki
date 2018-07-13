@@ -45,6 +45,7 @@ scalacOptions ++= Seq(
 
 addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.3")
 addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.patch)
+addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.2.4")
 
 val testSettings = Seq(
   libraryDependencies += "org.scalatest" %% "scalatest" % scalaTestVersion  % "test",
