@@ -60,3 +60,5 @@ lazy val fsfs = project
 
 libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.4" % "test"
 libraryDependencies ++= akkas.map(_ % "test")
+
+libraryDependencies += "com.storm-enroute" %% "scalameter" % "0.10" % "test"
