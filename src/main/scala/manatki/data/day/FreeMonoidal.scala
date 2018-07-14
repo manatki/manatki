@@ -1,14 +1,21 @@
-package manatki.data
+package manatki.data.day
+
 import cats.arrow.FunctionK
 import cats.syntax.functor._
 import cats.{Applicative, Eval, ~>}
-import manatki.data
+import FreeMonoidal._
 
 sealed trait FreeMonoidal[F[_], A] {
-  def mapK[G[_]](fk: F ~> G): FreeMonoidal[G, A] = data.FreeMonoidal.Trans[F, G](fk)(this)
+  def mapK[G[_]](fk: F ~> G): FreeMonoidal[G, A] =
+    Trans[F, G](fk)(this)
   def fold(implicit F: Applicative[F]): F[A] = foldEval.value
   def foldEval(implicit F: Applicative[F]): Eval[F[A]]
   def foldMap[G[_]: Applicative](fk: F ~> G): G[A] = mapK(fk).fold
+
+  def map[B](f: A => B): FreeMonoidal[F, B] = this match {
+    case Pure(a) => Pure(f(a))
+    case Cons(day) => Cons(day.map(f))
+  }
 }
 
 object FreeMonoidal {
@@ -27,7 +34,6 @@ object FreeMonoidal {
       case Pure(a)   => Pure(a)
       case Cons(day) => Cons(Day(f(day.fx), apply(day.gy))(day.comb))
     }
-
   }
 
   final case class Pure[F[_], A](a: A) extends FreeMonoidal[F, A]{
@@ -43,10 +49,7 @@ object FreeMonoidal {
 
   class FreeMonoidalApplicative[F[_]] extends Applicative[FreeMonoidal[F, ?]] {
 
-    override def map[A, B](fa: FM[F, A])(f: A => B): FM[F, B] = fa match {
-      case Pure(a) => Pure(f(a))
-      case Cons(day) => Cons(day.map(f))
-    }
+    override def map[A, B](fa: FM[F, A])(f: A => B): FM[F, B] = fa.map(f)
 
     override def pure[A](x: A): FreeMonoidal[F, A] = Pure(x)
 

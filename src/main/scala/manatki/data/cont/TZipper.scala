@@ -9,6 +9,7 @@ import cats.syntax.flatMap._
 import cats.syntax.functor._
 import cats.syntax.traverse._
 import cats._
+import Cont.reset
 
 
 /** Kiselyov generic traversable Zipper */
@@ -23,7 +24,7 @@ sealed trait TZipper[T[_], A] {
 object TZipper {
   def apply[T[_]: Traverse, A](fa: T[A]): TZipper[T, A] = {
     type CT[X] = Cont[TZipper[T, A], X]
-    fa.traverse[CT, A](a => Cont.shift(k => Cursor[T, A](a, oa => k(now(oa.getOrElse(a))).value).pure[CT])).map(Done(_)).reset.value
+    reset(fa.traverse[CT, A](a => Cont.shift(k => Cursor[T, A](a, oa => k(now(oa.getOrElse(a))).value).pure[CT])).map(Done(_))).value
   }
   type Move[T[_], A] = Option[A] => TZipper[T, A]
   final case class Done[T[_], A](result: T[A])                   extends TZipper[T, A]
