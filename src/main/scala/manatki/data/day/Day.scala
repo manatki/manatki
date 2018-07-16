@@ -28,6 +28,16 @@ object Day extends DayInstances1 {
   def combine[F[_], G[_], X, Y, A](fx: F[X], gy: G[Y])(comb: (X, Y) => A): Day[F, G, A] =
     new Impl(fx, gy, (x: X, y: Y) => Eval.later(comb(x, y)))
 
+  def left[G[_]: InvariantMonoidal] = new LeftPA[G](InvariantMonoidal[G])
+  class LeftPA[G[_]](val app: InvariantMonoidal[G]) extends AnyVal {
+    def apply[F[_], A](fa: F[A]): Day[F, G, A] = Day.combine(fa, app.unit)((a, _) => a)
+  }
+
+  def right[F[_]: InvariantMonoidal] = new RightPA[F](InvariantMonoidal[F])
+  class RightPA[F[_]](val app: InvariantMonoidal[F]) extends AnyVal {
+    def apply[G[_], A](ga: G[A]): Day[F, G, A] = Day.combine(app.unit, ga)((_, a) => a)
+  }
+
   private class Impl[F[_], G[_], XX, YY, A](val fx: F[XX], val gy: G[YY], val comb: (XX, YY) => Eval[A]) extends Day[F, G, A] {
     type X = XX
     type Y = YY
