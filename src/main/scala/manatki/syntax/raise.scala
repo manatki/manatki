@@ -1,4 +1,5 @@
-package manatki.syntax
+package manatki
+package syntax
 
 import cats.Applicative
 
