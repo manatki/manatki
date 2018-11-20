@@ -2,17 +2,17 @@ name := "manatki"
 
 version := "0.1"
 
-scalaVersion := "2.12.6"
+scalaVersion := "2.12.7"
 
-val catsVersion = "1.1.0"
-val catsEffectVersion = "1.0.0-RC2"
-val catsMtlVersion = "0.2.1"
-val monixVersion = "3.0.0-RC1"
+val catsVersion = "1.4.0"
+val catsEffectVersion = "1.0.0"
+val catsMtlVersion = "0.4.0"
+val monixVersion = "3.0.0-RC2"
 
-val akkaVersion = "2.5.12"
+val akkaVersion = "2.5.18"
 val akkaHttpVersion = "10.1.1"
 
-val fs2Version = "0.10.1"
+val fs2Version = "1.0.0"
 
 val scalaTestVersion = "3.0.5"
 val scalaCheckVersion = "1.13.4"
