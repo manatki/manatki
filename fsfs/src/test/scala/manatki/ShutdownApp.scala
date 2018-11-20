@@ -17,7 +17,7 @@ import scala.concurrent.ExecutionContext.Implicits._
 import scala.concurrent.duration._
 import scala.concurrent.duration.MILLISECONDS
 
-object TerminationUsage {
+object ShutdownApp {
   implicit val iotimer = IO.timer(global)
   implicit val cs      = IO.contextShift(global)
 

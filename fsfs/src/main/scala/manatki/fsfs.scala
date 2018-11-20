@@ -17,6 +17,7 @@ object fsfs {
     }.collect { case (_, Some(x)) => x }
 
   //as requested by Dmitrii 2:52:11 19.11.2018 https://t.me/scala_ru/182611
+  //see test/ShutdownApp
   type Shutdown[F[_]] = F[F[Unit]]
 
   /** gives access to single termination event, allowing stream to shutdown gracefully */
