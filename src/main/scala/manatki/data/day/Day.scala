@@ -1,10 +1,11 @@
-package manatki.data
+package manatki.data.day
 
+import cats._
+import cats.syntax.apply._
 import cats.syntax.coflatMap._
 import cats.syntax.comonad._
-import cats.syntax.apply._
+import cats.syntax.functor._
 import cats.syntax.semigroupal._
-import cats._
 
 trait Day[F[_], G[_], A] {
   type X
@@ -14,10 +15,28 @@ trait Day[F[_], G[_], A] {
   def comb: (X, Y) => Eval[A]
   def mapKFirst[H[_]](fk: F ~> H): Day[H, G, A]
   def mapKSecond[H[_]](fk: G ~> H): Day[F, H, A]
+  def map[B](f: A => B): Day[F, G, B]                 = Day[F, G, X, Y, B](fx, gy)((x, y) => comb(x, y).map(f))
+  def fold[H[_]: Apply](fk: F ~> H, gk: G ~> H): H[A] = fk(fx).map2(gk(gy))(comb).map(_.value)
+  def swap: Day[G, F, A]                              = Day(gy, fx)((y, x) => comb(x, y))
+
+  def projectL[B](implicit F: Functor[F], G: Comonad[G]): F[A] = fx.map(comb(_, gy.extract).value)
+  def projectR[B](implicit F: Comonad[F], G: Functor[G]): G[A] = gy.map(comb(fx.extract, _).value)
 }
 
 object Day extends DayInstances1 {
   def apply[F[_], G[_], X, Y, A](fx: F[X], gy: G[Y])(comb: (X, Y) => Eval[A]): Day[F, G, A] = new Impl(fx, gy, comb)
+  def combine[F[_], G[_], X, Y, A](fx: F[X], gy: G[Y])(comb: (X, Y) => A): Day[F, G, A] =
+    new Impl(fx, gy, (x: X, y: Y) => Eval.later(comb(x, y)))
+
+  def left[G[_]: InvariantMonoidal] = new LeftPA[G](InvariantMonoidal[G])
+  class LeftPA[G[_]](val app: InvariantMonoidal[G]) extends AnyVal {
+    def apply[F[_], A](fa: F[A]): Day[F, G, A] = Day.combine(fa, app.unit)((a, _) => a)
+  }
+
+  def right[F[_]: InvariantMonoidal] = new RightPA[F](InvariantMonoidal[F])
+  class RightPA[F[_]](val app: InvariantMonoidal[F]) extends AnyVal {
+    def apply[G[_], A](ga: G[A]): Day[F, G, A] = Day.combine(app.unit, ga)((_, a) => a)
+  }
 
   private class Impl[F[_], G[_], XX, YY, A](val fx: F[XX], val gy: G[YY], val comb: (XX, YY) => Eval[A]) extends Day[F, G, A] {
     type X = XX
@@ -27,8 +46,7 @@ object Day extends DayInstances1 {
   }
 
   class DayFunctor[F[_], G[_]] extends Functor[Day[F, G, ?]] {
-    override def map[A, B](fa: Day[F, G, A])(f: A => B): Day[F, G, B] =
-      Day[F, G, fa.X, fa.Y, B](fa.fx, fa.gy)((x, y) => fa.comb(x, y).map(f))
+    override def map[A, B](fa: Day[F, G, A])(f: A => B): Day[F, G, B] = fa.map(f)
   }
 
   class DayApply[F[_]: Semigroupal, G[_]: Semigroupal] extends DayFunctor[F, G] with Apply[Day[F, G, ?]] {
@@ -56,12 +74,21 @@ object Day extends DayInstances1 {
 }
 
 sealed trait DayInstances1 extends DayInstances2 { self: Day.type =>
-  implicit def applyInstance[F[_]: Semigroupal, G[_]: Semigroupal, A]: Apply[Day[F, G, ?]]                 = new DayApply
   implicit def applicative[F[_]: InvariantMonoidal, G[_]: InvariantMonoidal, A]: Applicative[Day[F, G, ?]] = new DayApplicative
 }
 
-sealed trait DayInstances2 { self: Day.type =>
-  implicit def functor[F[_], G[_], A]: Functor[Day[F, G, ?]]                           = new DayFunctor
+sealed trait DayInstances2 extends DayInstances3 { self: Day.type =>
+  implicit def applyInstance[F[_]: Semigroupal, G[_]: Semigroupal, A]: Apply[Day[F, G, ?]] = new DayApply
+}
+
+sealed trait DayInstances3 extends DayInstances4 { self: Day.type =>
   implicit def coflatMap[F[_]: CoflatMap, G[_]: CoflatMap, A]: CoflatMap[Day[F, G, ?]] = new DayCoflatMap
-  implicit def comonad[F[_]: Comonad, G[_]: Comonad, A]: CoflatMap[Day[F, G, ?]]       = new DayComonad
+}
+
+sealed trait DayInstances4 extends DayInstances5 { self: Day.type =>
+  implicit def comonad[F[_]: Comonad, G[_]: Comonad, A]: Comonad[Day[F, G, ?]] = new DayComonad
+}
+
+sealed trait DayInstances5 { self: Day.type =>
+  implicit def functor[F[_], G[_], A]: Functor[Day[F, G, ?]] = new DayFunctor
 }

@@ -6,7 +6,7 @@ import akka.actor.typed.scaladsl.adapter._
 import akka.actor.typed.{ActorRef, Behavior}
 import akka.util.Timeout
 import cats.Monad
-import cats.effect.{Async, ConcurrentEffect, IO, Timer}
+import cats.effect._
 import cats.effect.concurrent.{MVar, Ref}
 import cats.instances.list._
 import cats.syntax.apply._
@@ -158,29 +158,11 @@ abstract class AsyncMutFiberBench[F[_] : ConcurrentEffect] extends AsyncMutState
   } yield ()
 }
 
-//abstract class AsyncBenchImpl[F[_] : ConcurrentEffect] extends AsyncBench {
-//  def collatz(x: Int): F[Unit] =
-//    if (x == 1) Monad[F].unit else {
-//      val k = x % w
-//      for {
-//        prev <- counts(k).take
-//        _ <- counts(k).put(prev + 1)
-//        _ <- collatz(counts, next(x))
-//      } yield ()
-//    }
-//
-//  def exec(counts: Vector[MVar[F, Long]]): F[Unit] =
-//    List.range(1, n + 1).traverse_(collatz(counts, _))
-//
-//
-//  override def run: Future[Vector[Long]] =
-//    (for {
-//      counts <- Vector.fill(w)(MVar[F].of(0L)).sequence[F, MVar[F, Long]]
-//      _ <- exec(counts)
-//      result <- counts.traverse(_.read)
-//    } yield result).toIO.unsafeToFuture()
-//}
+object ioInstance {
+  implicit val cs: ContextShift[IO] = IO.contextShift(Scheduler.global)
+}
 
+import ioInstance.cs
 
 object IOBench extends AsyncMutStateBench[IO]
 object IOBenchFiber extends AsyncMutFiberBench[IO]

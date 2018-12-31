@@ -1,4 +1,5 @@
-package manatki.data
+package manatki.data.day
+
 import cats.implicits._
 import org.scalatest.{FlatSpec, Matchers}
 class FM extends FlatSpec with Matchers {
