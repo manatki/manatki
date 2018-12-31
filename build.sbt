@@ -6,7 +6,7 @@ scalaVersion := "2.12.6"
 
 val catsVersion = "1.1.0"
 val catsEffectVersion = "1.0.0-RC2"
-val catsMtlVersion = "0.2.1"
+val catsMtlVersion = "0.4.0"
 val monixVersion = "3.0.0-RC1"
 
 val akkaVersion = "2.5.12"
