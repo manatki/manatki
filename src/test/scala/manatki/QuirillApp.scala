@@ -1,5 +1,5 @@
 package manatki
-import java.nio.file.StandardOpenOption.TRUNCATE_EXISTING
+import java.nio.file.StandardOpenOption.{CREATE, TRUNCATE_EXISTING}
 import java.nio.file.{Files, Paths}
 
 import cats.Show
@@ -13,11 +13,10 @@ import scala.concurrent.duration._
 import scala.io.StdIn
 
 object QuirillApp extends TaskApp {
-  val out = Files.newBufferedWriter(Paths.get("output.txt"), TRUNCATE_EXISTING)
+  val out = Files.newBufferedWriter(Paths.get("output.txt"), TRUNCATE_EXISTING, CREATE)
 
   def log[F[_]](mess: String)(implicit F: Sync[F]): F[Unit]  = F.delay { out.write(mess); out.newLine(); out.flush() }
   def sleep[F[_]](t: Int)(implicit timer: Timer[F]): F[Unit] = timer.sleep(t seconds)
-
 
   def consumer[F[_]: Sync, A: Show](quirill: Quirill[F, A], batchSize: Int)(implicit t: Timer[F]): F[Unit] =
     (quirill.read(batchSize) >>= (v => log[F](show"took $v"))) *> sleep(1)
@@ -52,11 +51,11 @@ object QuirillApp extends TaskApp {
     none[Fiber[F, Unit]]
       .iterateForeverM[F, Unit] { prev =>
         for {
-          (qs, bs, vals) <- parseInput[F].guarantee(prev.traverse_[F, Unit](_.cancel))
+          f              <- parseInput[F].start
+          (qs, bs, vals) <- f.join.guarantee(prev.traverse_[F, Unit](_.cancel))
           f              <- process[F, Int](qs, bs, vals).start
         } yield f.some
       }
-      .guarantee(log[F]("exited"))
 
-  def run(args: List[String]): Task[ExitCode] = run[Task] as ExitCode.Success
+  def run(args: List[String]): Task[ExitCode] = run[Task].executeWithOptions(_.enableAutoCancelableRunLoops) as ExitCode.Success
 }
