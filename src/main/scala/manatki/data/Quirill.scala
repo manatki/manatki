@@ -3,12 +3,12 @@ import cats.effect.{Concurrent, Sync}
 import cats.effect.concurrent.{Ref, Semaphore}
 import cats.implicits._
 
-final case class Quirill[F[_]: Sync, A](lock: Semaphore[F], items: Ref[F, Vector[A]]) {
+final case class Quirill[F[_]: Sync, A] private (lock: Semaphore[F], items: Ref[F, Vector[A]]) {
   def read(count: Int): F[Vector[A]] =
-    items.modify(_.splitAt(count).swap) <* lock.releaseN(count)
+    items.modify(_.splitAt(count).swap).flatTap(v => lock.releaseN(v.size))
 
   def trySend(item: A): F[Boolean] =
-    lock.tryAcquire.ifM(items.update(_ :+ item) as true, false.pure[F])
+    lock.tryAcquire.flatTap(items.update(_ :+ item).whenA)
 }
 
 object Quirill {
