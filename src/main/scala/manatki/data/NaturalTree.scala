@@ -39,7 +39,7 @@ object NaturalTree {
     override def map[A, B](fa: NaturalTree[A])(f: A => B): NaturalTree[B] =
       NaturalTree(fa.x.map(f), fa.left.map(map(_)(f)), fa.right.map(map(_)(f)))
 
-    override def replicateA[A](n: Int, fa: NaturalTree[A]): NaturalTree[List[A]] =
-      NaturalTree(fa.x.map(List.fill(n)), fa.left.map(replicateA(n, _)), fa.right.map(replicateA(n, _)))
+    override def replicateA[U](n: Int, fa: NaturalTree[U]): NaturalTree[List[U]] =
+      NaturalTree(fa.x.map(List.fill(n)(_)), fa.left.map(replicateA(n, _)), fa.right.map(replicateA(n, _)))
   }
 }

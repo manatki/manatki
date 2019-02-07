@@ -4,15 +4,15 @@ version := "0.1"
 
 scalaVersion := "2.12.7"
 
-val catsVersion = "1.4.0"
-val catsEffectVersion = "1.0.0"
+val catsVersion = "1.6.0"
+val catsEffectVersion = "1.1.0"
 val catsMtlVersion = "0.4.0"
 val monixVersion = "3.0.0-RC2"
 
-val akkaVersion = "2.5.18"
-val akkaHttpVersion = "10.1.1"
+val akkaVersion = "2.5.189
+val akkaHttpVersion = "10.1.3"
 
-val fs2Version = "1.0.0"
+val fs2Version = "1.0.3"
 
 val scalaTestVersion = "3.0.5"
 val scalaCheckVersion = "1.13.4"
@@ -44,8 +44,8 @@ scalacOptions ++= Seq(
 )
 
 addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.3")
-addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.patch)
-addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.2.4")
+addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.1" cross CrossVersion.patch)
+addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.0-M4")
 
 val testSettings = Seq(
   libraryDependencies += "org.scalatest" %% "scalatest" % scalaTestVersion  % "test",
