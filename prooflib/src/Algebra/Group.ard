@@ -1,0 +1,78 @@
+\import Algebra.Monoid
+\import Paths
+
+\class Group \extends Monoid {
+  | inverse : E -> E
+  | inverse-left (x : E) : inverse x * x = ide
+  | inverse-right (x : E) : x * inverse x = ide
+} \where {
+  \func op (G : Group) : Group \cowith
+    | Monoid => Monoid.op G
+    | inverse => G.inverse
+    | inverse-left => G.inverse-right
+    | inverse-right => G.inverse-left
+}
+
+\func \infixl 7 / {G : Group} (x y : G) => x * inverse y
+
+\class AddGroup \extends AddMonoid {
+  | negative : E -> E
+  | negative-left (x : E) : negative x + x = zro
+  | negative-right (x : E) : x + negative x = zro
+
+  \lemma cancel-left (x y z : E) (p : x + y = x + z) : y = z =>
+    y                    ==< inv (zro-left y) >==
+    zro + y              ==< pmap (\lam t => t + y) (inv (negative-left x)) >==
+    (negative x + x) + y ==< +-assoc (negative x) x y >==
+    negative x + (x + y) ==< pmap (\lam t => negative x + t) p >==
+    negative x + (x + z) ==< inv (+-assoc (negative x) x z) >==
+    (negative x + x) + z ==< pmap (\lam t => t + z) (negative-left x) >==
+    zro + z              ==< zro-left z >==
+    z                    `qed
+
+  \lemma negative-isInvolution (x : E) : negative (negative x) = x =>
+    cancel-left (negative x) (negative (negative x)) x (negative-right (negative x) *> inv (negative-left x))
+
+  \lemma minus_zro (x : E) : x - zro = x =>
+    x - zro                  ==< inv (zro-right (x - zro)) >==
+    x - zro + zro            ==< +-assoc x (negative zro) zro >==
+    x + (negative zro + zro) ==< pmap (x +) (negative-left zro) >==
+    x + zro                  ==< zro-right x >==
+    x `qed
+
+  \lemma negative_+ (x y : E) : negative (x + y) = negative y - x => cancel-left (x + y) (negative (x + y)) (negative y - x) (
+    (x + y) - (x + y)          ==< negative-right (x + y) >==
+    zro                        ==< inv (negative-right x) >==
+    x - x                      ==< pmap (x +) (inv (zro-left (negative x))) >==
+    x + (zro - x)              ==< pmap (\lam t => x + (t - x)) (inv (negative-right y)) >==
+    x + ((y - y) - x)          ==< pmap (x +) (+-assoc y (negative y) (negative x)) >==
+    x + (y + (negative y - x)) ==< inv (+-assoc x y (negative y - x)) >==
+    (x + y) + (negative y - x) `qed
+  )
+
+  \lemma fromZero (x y : E) (x-y=0 : x - y = zro) : x = y =>
+    x                    ==< inv (zro-right x) >==
+    x + zro              ==< pmap (\lam t => x + t) (inv (negative-left y)) >==
+    x + (negative y + y) ==< inv (+-assoc x (negative y) y) >==
+    x - y + y            ==< pmap (\lam t => t + y) x-y=0 >==
+    zro + y              ==< zro-left y >==
+    y                    `qed
+
+  \lemma toZero (x y : E) (x=y : x = y) : x - y = zro => transport (\lam t => x - t = zro) x=y (negative-right x)
+} \where {
+    \use \coerce fromGroup (G : Group) => \new AddGroup G.E G.ide (G.*) G.ide-left G.ide-right G.*-assoc G.inverse G.inverse-left G.inverse-right
+    \use \coerce toGroup (G : AddGroup) => \new Group G.E G.zro (G.+) G.zro-left G.zro-right G.+-assoc G.negative G.negative-left G.negative-right
+  }
+
+\func \infixl 6 - {G : AddGroup} (x y : G) => x + negative y
+
+\class CGroup \extends Group, CancelCMonoid
+  | inverse-right x => *-comm x (inverse x) *> inverse-left x
+  | cancel-left => AddGroup.cancel-left {AddGroup.fromGroup \this}
+
+\class AbGroup \extends AddGroup, AbMonoid
+  | negative-right x => +-comm x (negative x) *> negative-left x
+  \where {
+    \use \coerce fromCGroup (G : CGroup) => \new AbGroup G.E G.ide (G.*) G.ide-left G.*-assoc G.inverse G.inverse-left G.*-comm
+    \use \coerce toCGroup (G : AbGroup) => \new CGroup G.E G.zro (G.+) G.zro-left G.+-assoc G.negative G.negative-left G.+-comm
+  }

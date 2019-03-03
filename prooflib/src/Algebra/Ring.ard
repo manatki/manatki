@@ -1,0 +1,40 @@
+\import Algebra.Group
+\import Algebra.Monoid
+\import Algebra.Semiring
+\import Paths
+
+\class Ring \extends Semiring, AbGroup {
+  | zro_*-left x => AddGroup.cancel-left (zro * x) (zro * x) zro (
+    zro * x + zro * x ==< inv (rdistr zro zro x) >==
+    (zro + zro) * x   ==< pmap (\lam t => t * x) (zro-left zro) >==
+    zro * x           ==< inv (zro-right (zro * x)) >==
+    zro * x + zro     `qed
+  )
+  | zro_*-right x => AddGroup.cancel-left (x * zro) (x * zro) zro (
+    x * zro + x * zro ==< inv (ldistr x zro zro) >==
+    x * (zro + zro)   ==< pmap (\lam t => x * t) (zro-left zro) >==
+    x * zro           ==< inv (zro-right (x * zro)) >==
+    x * zro + zro     `qed
+  )
+
+  \lemma negative_*-left (x y : E) : negative x * y = negative (x * y) =>
+    pmap (\lam (t : Inv {AbGroup.toCGroup \this} (x * y)) => t.inv)
+         (Inv.isProp {AbGroup.toCGroup \this}
+                     (Inv.lmake {AbGroup.toCGroup \this} (negative x * y) (inv (rdistr (negative x) x y) *> pmap (\lam t => t * y) (negative-left x) *> zro_*-left y))
+                     (Inv.lmake {AbGroup.toCGroup \this} (negative (x * y)) (negative-left (x * y))))
+    \where \open Monoid(Inv)
+
+  \lemma negative_*-right (x y : E) : x * negative y = negative (x * y) => negative_*-left {op \this} y x
+
+  \lemma negative_* (x y : E) : negative x * negative y = x * y =>
+    negative x * negative y     ==< negative_*-left x (negative y) >==
+    negative (x * negative y)   ==< pmap negative (negative_*-right x y) >==
+    negative (negative (x * y)) ==< AddGroup.negative-isInvolution (x * y) >==
+    x * y                       `qed
+} \where {
+  \func op (R : Ring) : Ring \cowith
+    | AbGroup => R
+    | Semiring => Semiring.op R
+}
+
+\class CRing \extends Ring, CSemiring

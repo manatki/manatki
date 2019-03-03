@@ -9,7 +9,7 @@ val catsEffectVersion = "1.1.0"
 val catsMtlVersion = "0.4.0"
 val monixVersion = "3.0.0-RC2"
 
-val akkaVersion = "2.5.189
+val akkaVersion = "2.5.19"
 val akkaHttpVersion = "10.1.3"
 
 val fs2Version = "1.0.3"

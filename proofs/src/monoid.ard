@@ -1,0 +1,32 @@
+\import Paths
+
+\class Semigroup (T : \Type)
+                 (combine : T -> T -> T)
+                 (associativity : \Pi (a b c : T) -> combine (combine a b) c = combine a (combine b c))
+  \where {
+    \func \infixr 5 |+| {T : \Type} {sg : Semigroup T} (a b : T) => sg.combine a b
+  }
+
+\class Monoid (empty : T )
+              (left_unit : \Pi (a : T) -> combine empty a = a)
+              (right_unit : \Pi (a : T) -> combine a empty = a)
+\extends Semigroup
+  \where {
+    \func emp {T : \Type} {mon : Monoid T} => mon.empty
+  }
+
+\open Nat
+\instance natMonoid : Monoid Nat
+  | combine a b => a + b
+  | empty => 0
+  | left_unit => natZeroSum
+  | right_unit a => idp
+  | associativity => natAssoc
+
+\func natZeroSum (a : Nat) :  0 + a = a
+  | zero => idp
+  | suc a' => pmap suc (natZeroSum a')
+
+\func natAssoc (a b c : Nat) : (a + b) + c = a + (b + c) \elim c
+  | zero => idp
+  | suc c' => pmap suc (natAssoc a b c')

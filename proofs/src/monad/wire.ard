@@ -1,0 +1,41 @@
+\import Paths
+\import monad
+\import monoid
+\open Semigroup
+\open Monoid
+
+\data Socket (S : \Type) (A : \Type)
+  | vacant S
+  | full  S A \where {
+  \func addL {S A : \Type} {sg : Semigroup S} (s1 : S) (sock : Socket S A) : Socket S A =>
+    \case sock \with {
+      | vacant s2 => vacant (s1 |+| s2)
+      | full s2 a => full (s1 |+| s2) a
+    }
+
+  \func addLlu {S A : \Type} {m : Monoid S} (sock : Socket S A) : addL emp sock = sock \elim sock
+  | vacant s => pmap vacant (m.left_unit s)
+  | full s a => pmap (\lam x => full x a) (m.left_unit s)
+
+
+  \func addLFullEmpty {S A : \Type }
+}
+
+\data SocketK (S : \Type)
+
+\instance socketMonad (S : \Type) {smon : Monoid S} : Monad (SocketK S){
+  | F A => Socket S A
+  | pure a => full emp a
+  | flatMap sa => flmap sa
+  | left_unit a f => Socket.addLlu (f a)
+  | right_unit sa => runit sa
+  | associativity fa f g => {?}
+} \where {
+  \func flmap {S A B : \Type}  {smon : Monoid S} (sa : Socket S A) (f : A -> Socket S B) : Socket S B \elim sa
+    | vacant s => vacant s
+    | full s a => Socket.addL s (f a)
+
+  \func runit {S A : \Type} {smon : Monoid S} (sa : Socket S A) : flmap sa (full emp) = sa \elim sa
+     | vacant s => idp
+     | full s a => pmap (\lam x => full x a) (smon.right_unit s)
+}

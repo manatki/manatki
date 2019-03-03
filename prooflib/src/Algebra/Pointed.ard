@@ -1,0 +1,11 @@
+\import Set
+
+\class Pointed \extends BaseSet
+  | ide : E
+
+\class AddPointed \extends BaseSet
+  | zro : E
+  \where {
+    \use \coerce fromPointed (P : Pointed) => \new AddPointed P.E P.ide
+    \use \coerce toPointed (P : AddPointed) => \new Pointed P.E P.zro
+  }
