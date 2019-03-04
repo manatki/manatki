@@ -14,11 +14,8 @@
     }
 
   \func addLlu {S A : \Type} {m : Monoid S} (sock : Socket S A) : addL emp sock = sock \elim sock
-  | vacant s => pmap vacant (m.left_unit s)
-  | full s a => pmap (\lam x => full x a) (m.left_unit s)
-
-
-  \func addLFullEmpty {S A : \Type }
+    | vacant s => pmap vacant (m.left_unit s)
+    | full s a => pmap (\lam x => full x a) (m.left_unit s)
 }
 
 \data SocketK (S : \Type)
@@ -29,13 +26,31 @@
   | flatMap sa => flmap sa
   | left_unit a f => Socket.addLlu (f a)
   | right_unit sa => runit sa
-  | associativity fa f g => {?}
+  | associativity {A} fa f g =>
+    \let eqfa fa' => flmap fa' (\lam x => flmap (f x) g) = flmap (flmap fa' f) g
+    \in \case fa \as sock, idp : sock = fa \with {
+      | vacant s , efa => transport eqfa efa idp
+      | full s a , efa =>
+        \let | eqf f_a' => Socket.addL s (flmap f_a' g) = flmap (Socket.addL s f_a') g
+             | H1 : eqf (f a) => \case f a \as f_a, idp : f_a = f a \with {
+               | vacant s1, ef_a => transport eqf ef_a idp
+               | full s1 b, ef_a =>
+                 \let | eqg g_b => Socket.addL s (Socket.addL s1 g_b) = Socket.addL (s |+| s1) g_b
+                      | H2 : eqg (g b) => \case g b \as g_b, idp : g_b = g b \with {
+                        | vacant s2 , eg_b => transport eqg eg_b (pmap vacant (inv (smon.associativity s s1 s2)))
+                        | full s2 c, eg_b => transport eqg eg_b (pmap (\lam s' => full s' c) (inv (smon.associativity s s1 s2)))
+                      }
+                 \in transport eqf ef_a H2
+             }
+        \in  transport eqfa efa H1
+
+    }
 } \where {
   \func flmap {S A B : \Type}  {smon : Monoid S} (sa : Socket S A) (f : A -> Socket S B) : Socket S B \elim sa
     | vacant s => vacant s
     | full s a => Socket.addL s (f a)
 
   \func runit {S A : \Type} {smon : Monoid S} (sa : Socket S A) : flmap sa (full emp) = sa \elim sa
-     | vacant s => idp
-     | full s a => pmap (\lam x => full x a) (smon.right_unit s)
+    | vacant s => idp
+    | full s a => pmap (\lam x => full x a) (smon.right_unit s)
 }

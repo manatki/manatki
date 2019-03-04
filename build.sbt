@@ -14,6 +14,8 @@ val akkaHttpVersion = "10.1.3"
 
 val fs2Version = "1.0.3"
 
+val drosteVersion = "0.6.0"
+
 val scalaTestVersion = "3.0.5"
 val scalaCheckVersion = "1.13.4"
 
@@ -29,6 +31,7 @@ libraryDependencies += "org.typelevel" %% "alleycats-core" % catsVersion
 libraryDependencies += "org.typelevel" %% "cats-effect" % catsEffectVersion
 libraryDependencies += "org.typelevel" %% "cats-mtl-core" % catsMtlVersion
 libraryDependencies += "io.monix" %% "monix" % monixVersion
+libraryDependencies += "io.higherkindness" %% "droste-core" % drosteVersion
 
 scalacOptions ++= Seq(
   "-Ypartial-unification",
