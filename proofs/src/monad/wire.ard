@@ -53,3 +53,37 @@
     | vacant s => idp
     | full s a => pmap (\lam x => full x a) (smon.right_unit s)
 }
+
+\data Wire (S : \Type)
+
+\instance wireMonad (S : \Type) : Monad (Wire S){
+  | F => ctr S
+  | pure a s => full s a
+  | flatMap wa fab s => cont (wa s) fab
+  | left_unit a f => idp
+  | right_unit {A} wa =>
+    \let eqvt x =>   cont x pur = x
+    \in funExt (\lam _ => Socket S A) (_) (_) (
+      \lam s => \case wa s \as was, idp : was = wa s  \with {
+        | vacant s1, e => transport eqvt e idp
+        | full s1 b, e => transport eqvt e idp
+      })
+  | associativity {A} {B} {C} wa f g =>
+    \let eqvt x => cont x (\lam x s => cont (f x s) g) = cont (cont x f) g
+    \in funExt (\lam _ => Socket S C) (_) (_) (
+      \lam s => \case wa s \as was, idp : was = wa s \with {
+        | vacant s, e => transport eqvt e idp
+        | full s b, e => transport eqvt e idp
+      })
+} \where {
+  \func pur {S A : \Type } (a : A) (s : S) : Socket S A => full s a
+
+  \func ctr  (S A : \Type) => S -> Socket S A
+
+  \func flmap {S A B : \Type} (wa : ctr S A) (fab : A -> ctr S B) (s : S) : Socket S B => cont (wa s) fab
+
+  \func cont {S A B : \Type} (was : Socket S A) (fab : A -> ctr S B)  : Socket S B => \case was \with{
+    | vacant s1 => vacant s1
+    | full s1 a => fab a s1
+  }
+}
