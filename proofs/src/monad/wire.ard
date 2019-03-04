@@ -1,8 +1,8 @@
 \import Paths
 \import monad
 \import monoid
-\open Semigroup
-\open Monoid
+\open Semigroup (|+|)
+\open Monoid (emp)
 
 \data Socket (S : \Type) (A : \Type)
   | vacant S
@@ -18,10 +18,7 @@
     | full s a => pmap (\lam x => full x a) (m.left_unit s)
 }
 
-\data SocketK (S : \Type)
-
-\instance socketMonad (S : \Type) {smon : Monoid S} : Monad (SocketK S){
-  | F A => Socket S A
+\func socketMonad (S : \Set) {smon : Monoid S} : Monad (Socket S) \cowith
   | pure a => full emp a
   | flatMap sa => flmap sa
   | left_unit a f => Socket.addLlu (f a)
@@ -44,20 +41,17 @@
              }
         \in  transport eqfa efa H1
     }
-} \where {
-  \func flmap {S A B : \Type}  {smon : Monoid S} (sa : Socket S A) (f : A -> Socket S B) : Socket S B \elim sa
-    | vacant s => vacant s
-    | full s a => Socket.addL s (f a)
+  \where {
+    \func flmap {S A B : \Type}  {smon : Monoid S} (sa : Socket S A) (f : A -> Socket S B) : Socket S B \elim sa
+      | vacant s => vacant s
+      | full s a => Socket.addL s (f a)
 
-  \func runit {S A : \Type} {smon : Monoid S} (sa : Socket S A) : flmap sa (full emp) = sa \elim sa
-    | vacant s => idp
-    | full s a => pmap (\lam x => full x a) (smon.right_unit s)
-}
+    \func runit {S A : \Type} {smon : Monoid S} (sa : Socket S A) : flmap sa (full emp) = sa \elim sa
+      | vacant s => idp
+      | full s a => pmap (\lam x => full x a) (smon.right_unit s)
+  }
 
-\data Wire (S : \Type)
-
-\instance wireMonad (S : \Type) : Monad (Wire S){
-  | F => ctr S
+\func wireMonad (S : \Set) : Monad (\lam A => S -> Socket S A) \cowith
   | pure a s => full s a
   | flatMap wa fab s => cont (wa s) fab
   | left_unit a f => idp
@@ -75,15 +69,22 @@
         | vacant s, e => transport eqvt e idp
         | full s b, e => transport eqvt e idp
       })
-} \where {
-  \func pur {S A : \Type } (a : A) (s : S) : Socket S A => full s a
+  \where {
+    \func pur {S A : \Type } (a : A) (s : S) : Socket S A => full s a
 
-  \func ctr  (S A : \Type) => S -> Socket S A
+    \func ctr  (S A : \Type) => S -> Socket S A
 
-  \func flmap {S A B : \Type} (wa : ctr S A) (fab : A -> ctr S B) (s : S) : Socket S B => cont (wa s) fab
+    \func flmap {S A B : \Type} (wa : ctr S A) (fab : A -> ctr S B) (s : S) : Socket S B => cont (wa s) fab
 
-  \func cont {S A B : \Type} (was : Socket S A) (fab : A -> ctr S B)  : Socket S B => \case was \with{
-    | vacant s1 => vacant s1
-    | full s1 a => fab a s1
+    \func cont {S A B : \Type} (was : Socket S A) (fab : A -> ctr S B)  : Socket S B => \case was \with{
+      | vacant s1 => vacant s1
+      | full s1 a => fab a s1
+    }
   }
-}
+
+\func wireTMonad (S : \Set) (X : \Set -> \Set) {fm : Monad X} : Monad (\lam A => S -> Socket S A) \cowith
+  | pure => {?}
+  | flatMap => {?}
+  | left_unit => {?}
+  | right_unit => {?}
+  | associativity => {?}
