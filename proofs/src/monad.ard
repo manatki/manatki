@@ -4,23 +4,23 @@
 \import funs
 \import sets
 
-\class Scala[_] (T : \Type ) (F : \Type -> \Type )
+\class TypeConstr (T : \Type ) (F : \Type -> \Type )
 
 \class Functor  (map : \Pi {A B : \Type} -> F A -> (A -> B)  -> F B)
                 (identity : \Pi { A : \Type } (fa : F A) -> map fa (\lam x => x) = fa)
                 (composition : \Pi { A B C : \Type } (fa : F A) (f : A -> B) (g : B -> C) -> map fa (g ~ f) = map (map fa f) g)
-                \extends Scala[_]
+                \extends TypeConstr
 
-\class Monad' (pure : \Pi {A : \Type } -> A -> F A)
+\class BaseMonad (pure : \Pi {A : \Type } -> A -> F A)
               (flatMap : \Pi {A B : \Type } -> F (A) -> (A -> F B) -> F B)
               (left_unit : \Pi { A B : \Type } (a : A) (f : A -> F B) -> flatMap (pure a) f = f a)
               (right_unit : \Pi { A : \Type } (fa : F A) -> flatMap fa pure = fa)
               (associativity : \Pi { A B C : \Type} (fa : F A) (f : A -> F B) (g : B -> F C) ->
                   flatMap fa (\lam x => flatMap (f x) g) = flatMap ( flatMap fa f ) g )
-              \extends Scala[_]
+              \extends TypeConstr
 
 
-\class Monad \extends Monad' , Functor {
+\class Monad \extends BaseMonad , Functor {
   | map fa f => flatMap  fa (\lam x => pure (f x))
   | identity => right_unit
   | composition {_} {_} {C}  fa f g =>

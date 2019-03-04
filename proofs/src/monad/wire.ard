@@ -43,7 +43,6 @@
                  \in transport eqf ef_a H2
              }
         \in  transport eqfa efa H1
-
     }
 } \where {
   \func flmap {S A B : \Type}  {smon : Monoid S} (sa : Socket S A) (f : A -> Socket S B) : Socket S B \elim sa
