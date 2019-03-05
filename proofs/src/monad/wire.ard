@@ -6,17 +6,18 @@
 
 \data Socket (S : \Type) (A : \Type)
   | vacant S
-  | full  S A \where {
-  \func addL {S A : \Type} {sg : Semigroup S} (s1 : S) (sock : Socket S A) : Socket S A =>
-    \case sock \with {
-      | vacant s2 => vacant (s1 |+| s2)
-      | full s2 a => full (s1 |+| s2) a
-    }
+  | full  S A
+  \where {
+    \func addL {S A : \Type} {sg : Semigroup S} (s1 : S) (sock : Socket S A) : Socket S A =>
+      \case sock \with {
+        | vacant s2 => vacant (s1 |+| s2)
+        | full s2 a => full (s1 |+| s2) a
+      }
 
-  \func addLlu {S A : \Type} {m : Monoid S} (sock : Socket S A) : addL emp sock = sock \elim sock
-    | vacant s => pmap vacant (m.left_unit s)
-    | full s a => pmap (\lam x => full x a) (m.left_unit s)
-}
+    \func addLlu {S A : \Type} {m : Monoid S} (sock : Socket S A) : addL emp sock = sock \elim sock
+      | vacant s => pmap vacant (m.left_unit s)
+      | full s a => pmap (\lam x => full x a) (m.left_unit s)
+  }
 
 \func socketMonad (S : \Set) {smon : Monoid S} : Monad (Socket S) \cowith
   | pure a => full emp a
