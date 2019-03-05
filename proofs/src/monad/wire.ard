@@ -66,8 +66,8 @@
     \let eqvt x => cont x (\lam x s => cont (f x s) g) = cont (cont x f) g
     \in funExt (\lam _ => Socket S C) (_) (_) (
       \lam s => \case wa s \as was, idp : was = wa s \with {
-        | vacant s, e => transport eqvt e idp
-        | full s b, e => transport eqvt e idp
+        | vacant s1, e => transport eqvt e idp
+        | full s1 a, e => transport eqvt e idp
       })
   \where {
     \func pur {S A : \Type } (a : A) (s : S) : Socket S A => full s a
@@ -82,9 +82,49 @@
     }
   }
 
-\func wireTMonad (S : \Set) (X : \Set -> \Set) {fm : Monad X} : Monad (\lam A => S -> Socket S A) \cowith
-  | pure => {?}
-  | flatMap => {?}
-  | left_unit => {?}
-  | right_unit => {?}
-  | associativity => {?}
+\func wireTMonad {S : \Set} {X : \Set -> \Set} (fm : Monad X) : Monad (\lam A => S -> X (Socket S A)) \cowith
+  | pure x s => fm.pure (full s x)
+  | flatMap wa => flmap X fm wa
+  | left_unit {_} {B} a fab => funExt (\lam _ => X (Socket S B)) (_) (fab a) ( \lam s =>  fm.left_unit (full s a)  (_) )
+  | right_unit {A} wa => funExt (\lam _ => X (Socket S A)) (_) wa (right-unit-step X {fm} wa  )
+  | associativity {A} {B} {C} wa f g => funExt (\lam _ => X (Socket S C)) (_) (_)  ( assoc-1 X fm wa f g)
+  \where {
+    \lemma assoc-1 {A B C S : \Set} (X : \Set -> \Set) (fm : Monad X) (wa : S -> X ( Socket S A))
+                   (f : A -> S -> X (Socket S B)) (g : B -> S -> X (Socket S C)) (s : S):
+      fm.flatMap (wa s) (flmap-match X fm (\lam b s1 => fm.flatMap (f b s1) (flmap-match X fm g))) =
+      fm.flatMap (fm.flatMap (wa s) (flmap-match X fm f)) (flmap-match X fm g) =>
+      transport (\lam u => fm.flatMap (wa s) u = fm.flatMap (fm.flatMap (wa s) (flmap-match X fm f)) (flmap-match X fm g))
+                (funExt (\lam _ => _) (_) (_) (assoc-2 X fm f g)) (fm.associativity (wa s) (_) (_))
+
+    \lemma assoc-2 {A B C S : \Set} (X : \Set -> \Set) (fm : Monad X)
+                   (f : A -> S -> X (Socket S B)) (g : B -> S -> X (Socket S C)) (sa : Socket S A) :
+      fm.flatMap (flmap-match X fm f sa) (flmap-match X fm g) =
+      flmap-match X fm (\lam b s1 => fm.flatMap (f b s1) (flmap-match X fm g)) sa \elim sa
+      | vacant s => fm.left_unit (vacant s) (flmap-match X fm g)
+      | full s a => idp
+
+    \lemma right-unit-step {S A : \Set} (X : \Set -> \Set) {fm : Monad X} (wa : S -> X (Socket S A)) (s : S) :
+      flmap X fm wa (\lam x s => fm.pure (full s x)) s = wa s =>
+      \let | r2 : fm.flatMap (wa s) (fm.pure) = wa s => fm.right_unit (wa s)
+      \in transport (\lam x => fm.flatMap (wa s) x = wa s) (inv (flmatch-pure-full fm)) r2
+
+    \func pure-full {S A : \Set} (X : \Set -> \Set) (fm : Monad X) (a : A) (s : S) : X (Socket S A) =>
+      fm.pure (full s a)
+
+    \func flmap {S A B : \Set} (X : \Set -> \Set) (fm : Monad X) (wa : S -> X( Socket S A)) (fab : A -> S -> X (Socket S B)) (s : S) : X (Socket S B) =>
+      fm.flatMap (wa s) ( flmap-match X fm fab )
+
+    \func flmap-match {S A B : \Set} (X : \Set -> \Set) (fm : Monad X) (fab : A -> S -> X (Socket S B)) (sa : Socket S A) : X (Socket S B) \elim sa
+      | vacant s1 => fm.pure( vacant s1 )
+      | full s1 a => fab a s1
+
+    \lemma flmatch-pure-full-s {S A : \Set} {X : \Set -> \Set} (fm : Monad X) (sa : Socket S A) :
+      flmap-match {S} {A} {A} X fm (pure-full X fm) sa = fm.pure sa \elim sa
+      | vacant _ => idp
+      | full _ _ => idp
+
+    \lemma flmatch-pure-full {S A : \Set} {X : \Set -> \Set} (fm : Monad X) :
+      flmap-match {S} {A} {A} X fm (pure-full X fm) = fm.pure =>
+      funExt (\lam _ => X( Socket S A)) (_) fm.pure (flmatch-pure-full-s fm)
+  }
+
