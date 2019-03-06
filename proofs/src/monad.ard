@@ -30,3 +30,8 @@
     \in pmap (\lam u => flatMap fa (u ~ f)) lu_extended *>  associativity fa (pure ~ f) gp
 }
 
+\record BaseFlattenMonad \extends Functor {
+  | flatten : \Pi {A : \Set}  -> F (F A) -> F A
+  \property l-unit : \Pi{A : \Set} (f : F A) -> map
+}
+

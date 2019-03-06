@@ -1,4 +1,5 @@
 package manatki.data
+
 import cats.data._
 import cats.kernel.Semigroup
 import cats.mtl.MonadState
@@ -7,30 +8,24 @@ import cats.syntax.applicative._
 import cats.syntax.functor._
 import cats.syntax.semigroup._
 import cats.{Applicative, FlatMap, Functor, Monad, MonadError, Monoid}
-import manatki.data.WireT.{Vacant, Full, Socket}
+import manatki.data.WireT.{Full, Socket, Vacant}
 
 /** a hybrid of StateT and EitherT */
-final class WireT[F[_], S, A](val runF: F[S => F[Socket[S, A]]]) extends AnyVal {
-  def run(s: S)(implicit F: FlatMap[F]): F[(S, Option[A])] = runT(s).map {
-    case Vacant(s1)  => (s1, None)
-    case Full(s1, a) => (s1, Some(a))
-  }
-
-  def runT(s: S)(implicit F: FlatMap[F]): F[Socket[S, A]] = runF.flatMap(_(s))
-}
+final case class WireT[F[_], S, A](run: S => F[Socket[S, A]]) extends AnyVal
 
 object WireT {
-
   sealed trait Socket[S, +A]
   final case class Vacant[S](s: S)        extends Socket[S, Nothing]
   final case class Full[S, A](s: S, a: A) extends Socket[S, A]
-
-  def applyF[F[_], S, A](runF: F[S => F[Socket[S, A]]]): WireT[F, S, A] = new WireT(runF)
+  object Socket {
+    def vacant[S, A](s: S): Socket[S, A]     = Vacant(s)
+    def full[S, A](s: S, a: A): Socket[S, A] = Full(s, a)
+  }
 
   def apply[F[_]] = new ApplyBuilder[F](true)
 
   class ApplyBuilder[F[_]](val __ : Boolean) extends AnyVal {
-    def apply[S, A](f: S => F[Socket[S, A]])(implicit F: Applicative[F]): WireT[F, S, A] = applyF(F.pure(f))
+    def apply[S, A](f: S => F[Socket[S, A]])(implicit F: Applicative[F]): WireT[F, S, A] = WireT(f)
   }
   def pure[F[_], S] = new PureBuilder[F, S](true)
 
@@ -55,8 +50,8 @@ object WireT {
   def fromEitherT[F[_]: Applicative, E, A](et: EitherT[F, E, A]): WireT[F, E, A] =
     WireT[F](e => et.value.map(_.fold(Vacant(_), Full(e, _))))
 
-  def fromStateT[F[_]: Applicative, S, A](st: StateT[F, S, A]): WireT[F, S, A] =
-    applyF(st.runF.map(run => s => run(s).map { case (s1, a) => Full(s1, a) }))
+  def fromStateT[F[_]: Monad, S, A](st: StateT[F, S, A]): WireT[F, S, A] =
+    apply(AndThen(st.run _).andThen(r => r.map { case (s1, a) => Socket.full(s1, a) }))
 
   def fromIorT[F[_]: Applicative, X: Semigroup, A](st: IorT[F, X, A]): WireT[F, X, A] =
     WireT[F](x =>
@@ -75,26 +70,22 @@ object WireT {
     new MonadError[WireT[F, S, ?], S] with MonadState[WireT[F, S, ?], S] {
       def pure[A](x: A): WireT[F, S, A] = WireT[F](s => pureLoad[F](s, x))
       def flatMap[A, B](fa: WireT[F, S, A])(f: A => WireT[F, S, B]): WireT[F, S, B] =
-        applyF(fa.runF.map { runa => s =>
-          runa(s).flatMap {
-            case ex @ Vacant(_) => F.pure(ex)
-            case Full(s1, a)    => f(a).runT(s1)
-          }
-        })
+        WireT(AndThen(fa.run).andThen(_.flatMap {
+          case ex @ Vacant(_) => F.pure[Socket[S, B]](ex)
+          case Full(s1, a)    => f(a).run(s1)
+        }))
       def raiseError[A](e: S): WireT[F, S, A] = WireT[F](_ => F.pure(Vacant(e)))
       def handleErrorWith[A](fa: WireT[F, S, A])(f: S => WireT[F, S, A]): WireT[F, S, A] =
-        applyF(fa.runF.map { run => s =>
-          run(s).flatMap {
-            case l @ Full(_, _) => F.pure(l)
-            case Vacant(s1)     => f(s1).runT(s1)
-          }
-        })
+        WireT(AndThen(fa.run).andThen(_.flatMap {
+          case l @ Full(_, _) => F.pure[Socket[S, A]](l)
+          case Vacant(s1)     => f(s1).run(s1)
+        }))
 
       def tailRecM[A, B](a: A)(f: A => WireT[F, S, Either[A, B]]): WireT[F, S, B] =
         WireT[F](s =>
           F.tailRecM((a, s)) {
             case (a1, s1) =>
-              f(a1).runT(s1).map {
+              f(a1).run(s1).map {
                 case Vacant(s2)         => Right(Vacant(s2))
                 case Full(s2, Left(a2)) => Left((a2, s2))
                 case Full(s2, Right(b)) => Right(Full(s2, b))
