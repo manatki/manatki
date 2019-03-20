@@ -24,7 +24,7 @@
   | flatMap sa => flmap sa
   | left_unit a f => Socket.addLlu (f a)
   | right_unit sa => runit sa
-  | associativity {A} fa f g =>
+  | associativity {A} fa f g =>n
     \let eqfa fa' => flmap fa' (\lam x => flmap (f x) g) = flmap (flmap fa' f) g
     \in \case fa \as sock, idp : sock = fa \with {
       | vacant s , efa => transport eqfa efa idp
