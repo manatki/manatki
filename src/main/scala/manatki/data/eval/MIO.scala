@@ -1,16 +1,27 @@
 package manatki.data.eval
 
+import cats.effect.{ExitCase, Sync}
 import cats.kernel.Monoid
-import cats.syntax.either._
 import cats.{MonadError, StackSafeMonad}
 
-import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.annotation.tailrec
+import scala.concurrent.{Future, Promise, ExecutionContext => EC}
+import scala.util.control.NonFatal
 
 sealed trait MIO[-R, S, +E, +A] {
-  final def run(r: R, init: S)(implicit ec: ExecutionContext): Future[(S, Either[E, A])] = MIO.run(this, r, init)
-  final def runEmpty(r: R)(implicit S: Monoid[S], ec: ExecutionContext)                  = run(r, Monoid.empty[S])
-  final def runEmptyUnit(implicit ev: Unit <:< R, S: Monoid[S], ec: ExecutionContext)    = runEmpty(())
-  final def runUnit(init: S)(implicit ev: Unit <:< R, ec: ExecutionContext)              = run((), init)
+  final def run(r: R, init: S)(implicit ec: EC): Future[(S, Either[E, A])] = {
+    val p = Promise[(S, Either[E, A])]
+    val cb = new MIO.Callback[S, E, A] {
+      def raised(state: S, error: E): Unit    = Future.successful((state, Left(error)))
+      def completed(state: S, value: A): Unit = Future.successful((state, Right(value)))
+      def broken(e: Throwable): Unit          = Future.failed(e)
+    }
+    MIO.run[R, S, E, A](this, r, init, cb)
+    p.future
+  }
+  final def runEmpty(r: R)(implicit S: Monoid[S], ec: EC)               = run(r, Monoid.empty[S])
+  final def runEmptyUnit(implicit ev: Unit <:< R, S: Monoid[S], ec: EC) = runEmpty(())
+  final def runUnit(init: S)(implicit ev: Unit <:< R, ec: EC)           = run((), init)
 }
 
 object MIO {
@@ -36,7 +47,7 @@ object MIO {
       ksuc: A => MIO[R, S, E, B],
       kerr: E => MIO[R, S, E, B]
   ) extends MIO[R, S, E, B]
-  final case class Await[R, S, E, A](kont: ((Either[E, A], S) => Unit) => Unit) extends MIO[R, S, E, A]
+  final case class Await[R, S, E, A](kont: Callback[S, E, A] => Unit) extends MIO[R, S, E, A]
 
   implicit class invariantOps[R, S, E, A](val calc: MIO[R, S, E, A]) extends AnyVal {
     def cont[B](f: A => MIO[R, S, E, B], h: E => MIO[R, S, E, B]): MIO[R, S, E, B] = Cont(calc, f, h)
@@ -46,51 +57,64 @@ object MIO {
     def map[B](f: A => B): MIO[R, S, E, B]                                         = flatMap(a => pure(f(a)))
   }
 
-  def run[R, S, E, A](calc: MIO[R, S, E, A], r: R, init: S)(implicit ec: ExecutionContext): Future[(S, Either[E, A])] = {
-    import Future.{successful => now}
-
-    calc match {
-      case Pure(a)     => now(init.asInstanceOf[S], Right(a))
-      case Read()      => now(init.asInstanceOf[S], Right(r.asInstanceOf[A]))
-      case Get()       => now(init.asInstanceOf[S], Right(init.asInstanceOf[A]))
-      case set: Set[S] => now(set.s, Right(().asInstanceOf[A]))
-      case Raise(e)    => now(init.asInstanceOf[S], Left(e))
-      case Defer(f)    => run(f(), r, init)
-      case Await(f) =>
-        val p = Promise[(S, Either[E, A])]
-        f((e, s) => p.success((s, e)))
-        p.future
+  trait Callback[S, E, A] {
+    def raised(state: S, error: E): Unit
+    def completed(state: S, value: A): Unit
+    def broken(e: Throwable): Unit
+  }
+  def run[R, S, E, A](calc: MIO[R, S, E, A], r: R, init: S, cb: Callback[S, E, A])(implicit ec: EC): Unit = {
+    @tailrec def loop(c: MIO[R, S, E, A], s: S): Unit = c match {
+      case Pure(a)     => cb.completed(s.asInstanceOf[S], a)
+      case Read()      => cb.completed(s.asInstanceOf[S], r.asInstanceOf[A])
+      case Get()       => cb.completed(s.asInstanceOf[S], s.asInstanceOf[A])
+      case set: Set[S] => cb.completed(set.s, ().asInstanceOf[A])
+      case Raise(e)    => cb.raised(s.asInstanceOf[S], e)
+      case Defer(f)    => loop(f(), s)
+      case Await(f)    => f.asInstanceOf[Callback[S, E, A] => Unit](cb)
       case Cont(src, ks, ke) =>
         val kee = ke.asInstanceOf[E => MIO[R, S, E, A]]
         src match {
-          case Pure(a)     => run(ks(a), r, init)
-          case Read()      => run(ks(r.asInstanceOf[A]), r, init)
-          case Get()       => run(ks(init.asInstanceOf[A]), r, init)
-          case set: Set[S] => run(ks(().asInstanceOf[A]), r, set.s)
-          case Raise(e)    => run(kee(e), r, init)
-          case Defer(f)    => run(f().cont(ks, kee), r, init)
+          case Pure(a)     => loop(ks(a), s)
+          case Read()      => loop(ks(r.asInstanceOf[A]), s)
+          case Get()       => loop(ks(s.asInstanceOf[A]), s)
+          case set: Set[S] => loop(ks(().asInstanceOf[A]), set.s)
+          case Raise(e)    => loop(kee(e), s)
+          case Defer(f)    => loop(f().cont(ks, kee), s)
           case Cont(src1, ks1, ke1) =>
             val kee1 = ke1.asInstanceOf[E => MIO[R, S, E, A]]
-            run(src1.cont(a => ks1(a).cont(ks, kee), e => kee1(e).cont(ks, kee)), r, init)
+            loop(src1.cont(a => ks1(a).cont(ks, kee), e => kee1(e).cont(ks, kee)), s)
           case Await(f) =>
-            val p = Promise[(S, Either[E, A])]
-            f {
-              case (Left(e), s)  => run(kee(e), r, s).foreach(p.success)
-              case (Right(a), s) => run(ks(a), r, s).foreach(p.success)
-            }
-            p.future
+            f.asInstanceOf[Callback[S, E, A] => Unit](new Callback[S, E, A] {
+              def raised(state: S, error: E): Unit    = ec.execute(() => run(kee(error), r, state, cb))
+              def completed(state: S, value: A): Unit = ec.execute(() => run(ks(value), r, state, cb))
+              def broken(e: Throwable): Unit          = cb.broken(e)
+            })
         }
+    }
+    try {
+      loop(calc, init)
+    } catch {
+      case NonFatal(e) => cb.broken(e)
     }
   }
 
-  implicit def calcInstance[R, S, E]: CalcFunctorInstance[R, S, E] = new CalcFunctorInstance[R, S, E]
+  implicit def calcInstance[R, S, E]: MIOAsyncInstance[R, S, E] = new MIOAsyncInstance[R, S, E]
 
-  class CalcFunctorInstance[R, S, E]
-      extends MonadError[MIO[R, S, E, ?], E] with cats.Defer[MIO[R, S, E, ?]] with StackSafeMonad[MIO[R, S, E, ?]] {
-    def defer[A](fa: => MIO[R, S, E, A]): MIO[R, S, E, A]                                 = MIO.defer(fa)
-    def raiseError[A](e: E): MIO[R, S, E, A]                                              = MIO.raise(e)
-    def handleErrorWith[A](fa: MIO[R, S, E, A])(f: E => MIO[R, S, E, A]): MIO[R, S, E, A] = fa.handleWith(f)
-    def flatMap[A, B](fa: MIO[R, S, E, A])(f: A => MIO[R, S, E, B]): MIO[R, S, E, B]      = fa.flatMap(f)
-    def pure[A](x: A): MIO[R, S, E, A]                                                    = MIO.pure(x)
+  class MIOAsyncInstance[R, S, E]
+      extends cats.Defer[MIO[R, S, E, ?]] with StackSafeMonad[MIO[R, S, E, ?]] with Sync[MIO[R, S, E, ?]] {
+    def suspend[A](fa: => MIO[R, S, E, A]): MIO[R, S, E, A]                          = MIO.defer(fa)
+    def flatMap[A, B](fa: MIO[R, S, E, A])(f: A => MIO[R, S, E, B]): MIO[R, S, E, B] = fa.flatMap(f)
+    def pure[A](x: A): MIO[R, S, E, A]                                               = MIO.pure(x)
+
+    def bracketCase[A, B](acquire: MIO[R, S, E, A])(use: A => MIO[R, S, E, B])(
+        release: (A, ExitCase[Throwable]) => MIO[R, S, E, Unit]): MIO[R, S, E, B] =
+      acquire.flatMap(a => use(a).cont(
+        b => ???,
+        e => ???
+      ))
+
+    def raiseError[A](e: Throwable): MIO[R, S, E, A] = delay(throw e)
+
+    def handleErrorWith[A](fa: MIO[R, S, E, A])(f: Throwable => MIO[R, S, E, A]): MIO[R, S, E, A] = ???
   }
 }
