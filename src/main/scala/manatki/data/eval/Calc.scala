@@ -4,8 +4,10 @@ import cats.kernel.Monoid
 import cats.syntax.either._
 
 sealed trait Calc[-R, S, +E, +A] {
-  final def run(r: R, init: S): (S, Either[E, A]) = Calc.run(this, r, init)
-  final def runEmpty(r: R)(implicit S: Monoid[S]) = run(r, Monoid.empty[S])
+  final def run(r: R, init: S): (S, Either[E, A])               = Calc.run(this, r, init)
+  final def runEmpty(r: R)(implicit S: Monoid[S])               = run(r, Monoid.empty[S])
+  final def runEmptyUnit(implicit ev: Unit <:< R, S: Monoid[S]) = runEmpty(())
+  final def runUnit(init: S)(implicit ev: Unit <:< R)           = run((), init)
 }
 
 object Calc {
