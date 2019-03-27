@@ -2,10 +2,10 @@ name := "manatki"
 
 version := "0.1"
 
-scalaVersion := "2.12.7"
+scalaVersion := "2.12.8"
 
 val catsVersion = "1.6.0"
-val catsEffectVersion = "1.1.0"
+val catsEffectVersion = "1.2.0"
 val catsMtlVersion = "0.4.0"
 val monixVersion = "3.0.0-RC2"
 
