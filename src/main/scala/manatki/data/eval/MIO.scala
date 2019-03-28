@@ -29,24 +29,25 @@ sealed trait MIO[-R, S, +E, +A] {
 
 object MIO {
   def pure[S, A](a: A): MIO[Any, S, Nothing, A]        = Pure(a)
-  def read[R, S]: MIO[R, S, Nothing, R]                = Read()
-  def get[S]: MIO[Any, S, Nothing, S]                  = Get()
+  def read[R, S]: MIO[R, S, Nothing, R]                = Read.asInstanceOf[MIO[R, S, Nothing, R]]
+  def get[S]: MIO[Any, S, Nothing, S]                  = Get.asInstanceOf[MIO[Any, S, Nothing, S]]
   def set[S](s: S): MIO[Any, S, Nothing, Unit]         = Set(s)
   def update[S](f: S => S): MIO[Any, S, Nothing, Unit] = get[S].flatMap(s => set(f(s)))
   def raise[S, E](e: E): MIO[Any, S, E, Nothing]       = Raise(e)
   def defer[R, S, E, A](x: => MIO[R, S, E, A])         = Defer(() => x)
   def delay[S, A](x: => A): MIO[Any, S, Nothing, A]    = defer(pure(x))
-  def exec[S]: MIO[Any, S, Nothing, EC]                = Exec()
+  def exec[S]: MIO[Any, S, Nothing, EC]                = Exec.asInstanceOf[MIO[Any, S, Nothing, EC]]
 
   def write[S](s: S)(implicit S: Monoid[S]): MIO[Any, S, Nothing, Unit] = update(S.combine(_, s))
 
+  type MIOGetter = MIO[Any, Nothing, Nothing, Nothing]
   final case class Pure[S, A](a: A)                            extends MIO[Any, S, Nothing, A]
-  final case class Read[R, S]()                                extends MIO[R, S, Nothing, R]
-  final case class Get[S]()                                    extends MIO[Any, S, Nothing, S]
+  private case object Read                                             extends MIOGetter
+  private case object Get                                              extends MIOGetter
   final case class Set[S](s: S)                                extends MIO[Any, S, Nothing, Unit]
   final case class Raise[S, E](e: E)                           extends MIO[Any, S, E, Nothing]
   final case class Defer[R, S, E, A](e: () => MIO[R, S, E, A]) extends MIO[R, S, E, A]
-  final case class Exec[S]()                                   extends MIO[Any, S, Nothing, EC]
+  private case object Exec                                             extends MIOGetter
   final case class Cont[R, S, E, A, B](
       src: MIO[R, S, E, A],
       ksuc: A => MIO[R, S, E, B],
@@ -79,23 +80,23 @@ object MIO {
     def ret(x: Any): A = x.asInstanceOf[A]
     @tailrec def loop(c: MIO[R, S, E, A], s: S): Unit = c match {
       case Pure(a)     => cb.completed(s, a)
-      case Read()      => cb.completed(s, ret(r))
-      case Get()       => cb.completed(s, ret(s))
+      case Read        => cb.completed(s, ret(r))
+      case Get         => cb.completed(s, ret(s))
       case set: Set[S] => cb.completed(set.s, ret(()))
       case Raise(e)    => cb.raised(s.asInstanceOf[S], e)
       case Defer(f)    => loop(f(), s)
       case Await(f)    => f.asInstanceOf[Callback[S, E, A] => Unit](cb)
-      case Exec()      => cb.completed(s, ret(ec))
+      case Exec        => cb.completed(s, ret(ec))
       case Cont(src, ks, ke) =>
         val kee = ke.asInstanceOf[E => MIO[R, S, E, A]]
         src match {
           case Pure(a)     => loop(ks(a), s)
-          case Read()      => loop(ks(ret(r)), s)
-          case Get()       => loop(ks(ret(r)), s)
+          case Read        => loop(ks(ret(r)), s)
+          case Get         => loop(ks(ret(r)), s)
           case set: Set[S] => loop(ks(ret(())), set.s)
           case Raise(e)    => loop(kee(e), s)
           case Defer(f)    => loop(f().cont(ks, kee), s)
-          case Exec()      => loop(ks(ret(ec)), s)
+          case Exec        => loop(ks(ret(ec)), s)
           case Cont(src1, ks1, ke1) =>
             val kee1 = ke1.asInstanceOf[E => MIO[R, S, E, A]]
             loop(src1.cont(a => ks1(a).cont(ks, kee), e => kee1(e).cont(ks, kee)), s)
