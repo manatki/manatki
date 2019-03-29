@@ -67,11 +67,12 @@ object MIO {
   final case class Await[R, S, E, A](kont: Callback[S, E, A] => Unit) extends MIO[R, Any, S, E, A]
 
   implicit class invariantOps[R, S1, S2, E, A](val calc: MIO[R, S1, S2, E, A]) extends AnyVal {
-    def cont[E2, S3, B](f: A => MIO[R, S2, S3, E2, B], h: E => MIO[R, S2, S3, E2, B]): MIO[R, S1, S3, E2, B] = Cont(calc, f, h)
-    def flatMap[B](f: A => MIO[R, S2, S2, E, B]): MIO[R, S1, S2, E, B]                                       = cont(f, raise(_: E))
-    def handleWith[E2](f: E => MIO[R, S2, S2, E2, A]): MIO[R, S1, S2, E2, A]                                 = cont(pure(_: A), f)
-    def handle(f: E => A): MIO[R, S1, S2, E, A]                                                              = handleWith(e => pure(f(e)))
-    def map[B](f: A => B): MIO[R, S1, S2, E, B]                                                              = flatMap(a => pure(f(a)))
+    def cont[E2, S3, B](f: A => MIO[R, S2, S3, E2, B], h: E => MIO[R, S2, S3, E2, B]): MIO[R, S1, S3, E2, B] =
+      Cont(calc, f, h)
+    def flatMap[B](f: A => MIO[R, S2, S2, E, B]): MIO[R, S1, S2, E, B]       = cont(f, raise(_: E))
+    def handleWith[E2](f: E => MIO[R, S2, S2, E2, A]): MIO[R, S1, S2, E2, A] = cont(pure(_: A), f)
+    def handle(f: E => A): MIO[R, S1, S2, E, A]                              = handleWith(e => pure(f(e)))
+    def map[B](f: A => B): MIO[R, S1, S2, E, B]                              = flatMap(a => pure(f(a)))
   }
 
   implicit class successfulOps[R, S1, S2, A](val calc: MIO[R, S1, S2, Nothing, A]) extends AnyVal {
@@ -92,7 +93,8 @@ object MIO {
     }
   }
 
-  def run[R, S1, S2, E, A](calc: MIO[R, S1, S2, E, A], r: R, init: S1, cb: Callback[S2, E, A])(implicit ec: EC): Unit = {
+  def run[R, S1, S2, E, A](calc: MIO[R, S1, S2, E, A], r: R, init: S1, cb: Callback[S2, E, A])(
+      implicit ec: EC): Unit = {
     def ret(x: Any): A = x.asInstanceOf[A]
     @tailrec def loop[S](c: MIO[R, S, S2, E, A], s: S): Unit = c match {
       case stateless: MIOStateless[R, S, S2, E, A] =>
