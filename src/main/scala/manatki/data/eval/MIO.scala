@@ -2,7 +2,6 @@ package manatki.data.eval
 
 import cats.StackSafeMonad
 import cats.effect.{Async, ExitCase}
-import cats.evidence.As
 import cats.kernel.Monoid
 import cats.syntax.apply._
 import cats.syntax.functor._
@@ -38,6 +37,8 @@ object MIO {
   def exec[S]: MIO[Any, S, S, Nothing, EC]                         = Exec()
 
   def write[S](s: S)(implicit S: Monoid[S]): MIO[Any, S, S, Nothing, Unit] = update(S.combine(_, s))
+
+  type Catcher = MIO[Any, Any, Any, Nothing, Unit]
 
   sealed trait MIOSimple[-R, -S1, +S2, +E, A] extends MIO[R, S1, S2, E, A] {
     private[MIO] def respond(s: S1, r: R, ec: EC, cb: Callback[S2, E, A]): Unit
@@ -84,10 +85,21 @@ object MIO {
     type MidErr   = E1
     type MidVal   = A
   }
-  final case class Await[R, S, E, A](kont: Callback[S, E, A] => Unit)                      extends MIO[R, Any, S, E, A]
-  final case class Catch[R, S1, S2, E, A](f: Throwable => Unit, src: MIO[R, S1, S2, E, A]) extends MIO[R, S1, S2, E, A]
+  final case class Await[R, S, E, A](kont: Callback[S, E, A] => Unit) extends MIO[R, Any, S, E, A]
+  final case class Catch[R, S1, S2, E, A](f: Throwable => Catcher, src: MIO[R, S1, S2, E, A])
+      extends MIO[R, S1, S2, E, A]
   private[MIO] final case class Uncatch[A, R, S1, S2, E, B](a: A, f: A => MIO[R, S1, S2, E, B])
       extends MIO[R, S1, S2, E, B]
+
+
+  sealed trait SupplyCont[R, S1, S2, E, A] extends MIO[R, S1, S2, E, A] {
+    def cont[S3, E2, B](ss: A => MIO[R, S2, S3, E2, B], ee: E => MIO[R, S2, S3, E2, B]): Next[S3, E2, B]
+  }
+  final case class Supply[R, S1, S2, E, A](r: R, s: S1, m: MIO[R, S1, S2, E, A])
+      extends MIO[Any, Any, S2, E, A] with Next[S2, E, A] with SupplyCont[R, S1, S2, E, A]{
+    def cont[S3, E2, B](ss: A => MIO[R, S2, S3, E2, B], ee: E => MIO[R, S2, S3, E2, B]): Next[S3, E2, B] =
+      Supply(r, s, m.cont(ss, ee))
+  }
 
   implicit class invariantOps[R, S1, S2, E, A](val calc: MIO[R, S1, S2, E, A]) extends AnyVal {
     def cont[R2 <: R, E2, S3, B](f: A => MIO[R2, S2, S3, E2, B],
@@ -95,8 +107,9 @@ object MIO {
       Cont(calc, f, h)
     def flatMap[B, R2 <: R](f: A => MIO[R2, S2, S2, E, B]): MIO[R2, S1, S2, E, B] = cont(f, raise(_: E))
     def handleWith[E2](f: E => MIO[R, S2, S2, E2, A]): MIO[R, S1, S2, E2, A]      = cont(pure(_: A), f)
-    def handle(f: E => A): MIO[R, S1, S2, E, A]                                   = handleWith(e => pure(f(e)))
+    def handle(f: E => A): MIO[R, S1, S2, Nothing, A]                             = handleWith(e => pure(f(e)))
     def map[B](f: A => B): MIO[R, S1, S2, E, B]                                   = flatMap(a => pure(f(a)))
+    def supply(s: S1, r: R): MIO[Any, Any, S2, E, A]                              = Supply(r, s, calc)
   }
 
   implicit class successfulOps[R, S1, S2, A](val calc: MIO[R, S1, S2, Nothing, A]) extends AnyVal {
@@ -117,13 +130,28 @@ object MIO {
     }
   }
 
-  def run[R, S1, S2, E, A](calc: MIO[R, S1, S2, E, A],
-                           r: R,
-                           init: S1,
-                           cb: Callback[S2, E, A],
-                           catches: List[Throwable => Unit] = Nil)(implicit ec: EC): Unit = {
+  sealed trait Next[+S2, +E, +A]
+  case object Stop extends Next[Nothing, Nothing, Nothing]
+  object Next {
+    implicit def unitToStop[S, E, A](x: Unit): Next[S, E, A] = Stop
+  }
+
+  private def reRun[R, S1, S2, E, A](calc: MIO[R, S1, S2, E, A],
+                                     r: R,
+                                     init: S1,
+                                     cb: Callback[S2, E, A],
+                                     catches: List[Throwable => Catcher] = Nil,
+                                     rest: List[Catcher])(implicit ec: EC): Unit =
+    run(calc, r, init, cb, catches, rest)
+
+  @tailrec def run[R, S1, S2, E, A](calc: MIO[R, S1, S2, E, A],
+                                    r: R,
+                                    init: S1,
+                                    cb: Callback[S2, E, A],
+                                    catches: List[Throwable => Catcher] = Nil,
+                                    rest: List[Catcher] = Nil)(implicit ec: EC): Unit = {
     var cs = catches
-    @tailrec def loop[S](m: MIO[R, S, S2, E, A], s: S): Unit = m match {
+    @tailrec def loop[S](m: MIO[R, S, S2, E, A], s: S): Next[S2, E, A] = m match {
       case simple: MIOSimple[R, S, S2, E, A] => simple.respond(s, r, ec, cb)
       case Defer(f)                          => loop(f(), s)
       case Await(f)                          => f(cb)
@@ -133,10 +161,13 @@ object MIO {
       case Uncatch(a, k) =>
         cs = cs.drop(1)
         loop(k(a), s)
+      case s @ Supply(_, _, _) => s
       case c @ Cont(src, ks, ke) =>
         src match {
           case simple: MIOSimple[R, S, c.MidState, c.MidErr, c.MidErr] =>
             loop(simple.contf(s, r, ec, ks, ke), s)
+          case sup : SupplyCont[R, S, c.MidState, c.MidErr, c.MidVal] =>
+            sup.cont(ks, ke)
           case Catch(c1, src1) =>
             cs ::= c1
             loop(src1.cont(a => Uncatch(a, ks), e => Uncatch(e, ke)), s)
@@ -148,9 +179,10 @@ object MIO {
             loop(src1.cont(a => ks1(a).cont(ks, ke), e => ke1(e).cont(ks, ke)), s)
           case Await(f) =>
             f(new Callback[c.MidState, c.MidErr, c.MidVal] {
-              def raised(state: c.MidState, error: c.MidErr): Unit = ec.execute(() => run(ke(error), r, state, cb, cs))
+              def raised(state: c.MidState, error: c.MidErr): Unit =
+                ec.execute(() => reRun(ke(error), r, state, cb, cs, rest))
               def completed(state: c.MidState, value: c.MidVal): Unit =
-                ec.execute(() => run(ks(value), r, state, cb, cs))
+                ec.execute(() => reRun(ks(value), r, state, cb, cs, rest))
               def broken(e: Throwable): Unit = {
                 for (c <- cs) c(e)
                 cb.broken(e)
@@ -158,12 +190,21 @@ object MIO {
             })
         }
     }
-    try {
-      loop(calc, init)
+    val (next, follows): (Next[S2, E, A], List[Catcher]) = try {
+      loop(calc, init) -> rest
     } catch {
       case NonFatal(e) =>
-        for (c <- cs) c(e)
         cb.broken(e)
+        Stop -> (cs.map(_(e)) ::: rest)
+    }
+
+    next match {
+      case Stop =>
+        follows match {
+          case head :: rest1 => run(head, (), (), Callback.empty, Nil, rest1)
+          case _             =>
+        }
+      case Supply(r1, s1, m) => run(m, r1, s1, cb, cs, rest)
     }
   }
 
@@ -180,7 +221,7 @@ object MIO {
       (acquire, info[R, S]).tupled.flatMap {
         case (a, (r, s, ec)) =>
           Catch(
-            e => run(release(a, ExitCase.Error(e)), r, s, Callback.empty)(ec),
+            e => release(a, ExitCase.Error(e)).supply(s, r).handle(_ => ()),
             use(a).cont(
               b => release(a, ExitCase.Completed) as b,
               e => release(a, ExitCase.Error(MIOExcept(e))) *> raise(e)
