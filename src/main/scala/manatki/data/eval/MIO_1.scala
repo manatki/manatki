@@ -15,9 +15,9 @@ sealed trait MIO_1[-R, S, +E, +A] {
   final def run(r: R, init: S)(implicit ec: EC): Future[(S, Either[E, A])] = {
     val p = Promise[(S, Either[E, A])]
     val cb = new MIO_1.Callback[S, E, A] {
-      def raised(state: S, error: E): Unit    = Future.successful((state, Left(error)))
-      def completed(state: S, value: A): Unit = Future.successful((state, Right(value)))
-      def broken(e: Throwable): Unit          = Future.failed(e)
+      def raised(state: S, error: E): Unit    = p.success(state -> Left(error))
+      def completed(state: S, value: A): Unit = p.success(state -> Right(value))
+      def broken(e: Throwable): Unit           = p.failure(e)
     }
     MIO_1.run[R, S, E, A](this, r, init, cb)
     p.future
