@@ -28,6 +28,7 @@ sealed trait MIO[-R, -S1, +S2, +E, +A] {
 object MIO {
   def pure[S, A](a: A): MIO[Any, S, S, Nothing, A]                 = Pure(a)
   def read[R, S]: MIO[R, S, S, Nothing, R]                         = Read()
+  def info[R, S]: MIO[R, S, S, Nothing, (R, S, EC)]                = Info()
   def get[S]: MIO[Any, S, S, Nothing, S]                           = Get()
   def set[S](s: S): MIO[Any, Any, S, Nothing, Unit]                = Set(s)
   def update[S1, S2](f: S1 => S2): MIO[Any, S1, S2, Nothing, Unit] = get[S1].flatMapS(s => set(f(s)))
@@ -40,21 +41,42 @@ object MIO {
 
   type MIOGetter = MIO[Any, Any, Nothing, Nothing, Nothing]
 
-  sealed trait MIOStateless[-R, -S1, +S2, +E, A] extends MIO[R, S1, S2, E, A] {
-    def stateAs: S1 As S2
-    def coerce(s: S1): S2 = stateAs.coerce(s)
-  }
-  sealed trait MIOSS[-R, S, +E, A] extends MIOStateless[R, S, S, E, A] {
-    def stateAs = As.refl[S]
+  sealed trait MIOSimple[-R, -S1, +S2, +E, A] extends MIO[R, S1, S2, E, A] {
+    private[MIO] def respond(s: S1, r: R, ec: EC, cb: Callback[S2, E, A]): Unit
+    private[MIO] def contf[X](s: S1, r: R, ec: EC, f: A => X, h: E => X): X
   }
 
-  final case class Pure[S, A](a: A)                                      extends MIOSS[Any, S, Nothing, A]
-  final case class Read[S, R]()                                          extends MIOSS[R, S, Nothing, R]
-  final case class Get[S]()                                              extends MIOSS[Any, S, Nothing, S]
-  final case class Set[S](s: S)                                          extends MIO[Any, Any, S, Nothing, Unit]
-  final case class Raise[S, E](e: E)                                     extends MIOSS[Any, S, E, Nothing]
+  final case class Pure[S, A](a: A) extends MIOSimple[Any, S, S, Nothing, A] {
+    private[MIO] def respond(s: S, r: Any, ec: EC, cb: Callback[S, Nothing, A]): Unit = cb.completed(s, a)
+    private[MIO] def contf[X](s: S, r: Any, ec: EC, f: A => X, h: Nothing => X)       = f(a)
+  }
+  final case class Read[S, R]() extends MIOSimple[R, S, S, Nothing, R] {
+    private[MIO] def respond(s: S, r: R, ec: EC, cb: Callback[S, Nothing, R]): Unit = cb.completed(s, r)
+    private[MIO] def contf[X](s: S, r: R, ec: EC, f: R => X, h: Nothing => X)       = f(r)
+  }
+  final case class Get[S]() extends MIOSimple[Any, S, S, Nothing, S] {
+    private[MIO] def respond(s: S, r: Any, ec: EC, cb: Callback[S, Nothing, S]): Unit = cb.completed(s, s)
+    private[MIO] def contf[X](s: S, r: Any, ec: EC, f: S => X, h: Nothing => X)       = f(s)
+  }
+
+  final case class Info[R, S]() extends MIOSimple[R, S, S, Nothing, (R, S, EC)] {
+    private[MIO] def respond(s: S, r: R, ec: EC, cb: Callback[S, Nothing, (R, S, EC)]): Unit =
+      cb.completed(s, (r, s, ec))
+    private[MIO] def contf[X](s: S, r: R, ec: EC, f: ((R, S, EC)) => X, h: Nothing => X) = f((r, s, ec))
+  }
+  final case class Set[S](s: S) extends MIOSimple[Any, Any, S, Nothing, Unit] {
+    private[MIO] def respond(old: Any, r: Any, ec: EC, cb: Callback[S, Nothing, Unit]): Unit = cb.completed(s, ())
+    private[MIO] def contf[X](old: Any, r: Any, ec: EC, f: Unit => X, h: Nothing => X)       = f(())
+  }
+  final case class Raise[S, E](e: E) extends MIOSimple[Any, S, S, E, Nothing] {
+    private[MIO] def respond(s: S, r: Any, ec: EC, cb: Callback[S, E, Nothing]): Unit = cb.raised(s, e)
+    private[MIO] def contf[X](s: S, r: Any, ec: EC, f: Nothing => X, h: E => X)       = h(e)
+  }
   final case class Defer[R, S1, S2, E, A](e: () => MIO[R, S1, S2, E, A]) extends MIO[R, S1, S2, E, A]
-  final case class Exec[S]()                                             extends MIOSS[Any, S, Nothing, EC]
+  final case class Exec[S]() extends MIOSimple[Any, S, S, Nothing, EC] {
+    private[MIO] def respond(s: S, r: Any, ec: EC, cb: Callback[S, Nothing, EC]): Unit = cb.completed(s, ec)
+    private[MIO] def contf[X](s: S, r: Any, ec: EC, f: EC => X, h: Nothing => X)       = f(ec)
+  }
   final case class Cont[R, S1, S2, S3, E1, E2, A, B](
       src: MIO[R, S1, S2, E1, A],
       ksuc: A => MIO[R, S2, S3, E2, B],
@@ -65,14 +87,19 @@ object MIO {
     type MidVal   = A
   }
   final case class Await[R, S, E, A](kont: Callback[S, E, A] => Unit) extends MIO[R, Any, S, E, A]
+  final case class Catch[R, S1, S2, E, A](f: Throwable => Unit, src: MIO[R, S1, S2, E, A])
+      extends MIO[R, S1, S2, E, A]
+  private[MIO] final case class Uncatch[A, R, S1, S2, E, B](a: A, f: A => MIO[R, S1, S2, E, B])
+      extends MIO[R, S1, S2, E, B]
 
   implicit class invariantOps[R, S1, S2, E, A](val calc: MIO[R, S1, S2, E, A]) extends AnyVal {
-    def cont[E2, S3, B](f: A => MIO[R, S2, S3, E2, B], h: E => MIO[R, S2, S3, E2, B]): MIO[R, S1, S3, E2, B] =
+    def cont[R2 <: R, E2, S3, B](f: A => MIO[R2, S2, S3, E2, B],
+                                 h: E => MIO[R2, S2, S3, E2, B]): MIO[R2, S1, S3, E2, B] =
       Cont(calc, f, h)
-    def flatMap[B](f: A => MIO[R, S2, S2, E, B]): MIO[R, S1, S2, E, B]       = cont(f, raise(_: E))
-    def handleWith[E2](f: E => MIO[R, S2, S2, E2, A]): MIO[R, S1, S2, E2, A] = cont(pure(_: A), f)
-    def handle(f: E => A): MIO[R, S1, S2, E, A]                              = handleWith(e => pure(f(e)))
-    def map[B](f: A => B): MIO[R, S1, S2, E, B]                              = flatMap(a => pure(f(a)))
+    def flatMap[B, R2 <: R](f: A => MIO[R2, S2, S2, E, B]): MIO[R2, S1, S2, E, B] = cont(f, raise(_: E))
+    def handleWith[E2](f: E => MIO[R, S2, S2, E2, A]): MIO[R, S1, S2, E2, A]      = cont(pure(_: A), f)
+    def handle(f: E => A): MIO[R, S1, S2, E, A]                                    = handleWith(e => pure(f(e)))
+    def map[B](f: A => B): MIO[R, S1, S2, E, B]                                    = flatMap(a => pure(f(a)))
   }
 
   implicit class successfulOps[R, S1, S2, A](val calc: MIO[R, S1, S2, Nothing, A]) extends AnyVal {
@@ -93,65 +120,76 @@ object MIO {
     }
   }
 
-  def run[R, S1, S2, E, A](calc: MIO[R, S1, S2, E, A], r: R, init: S1, cb: Callback[S2, E, A])(
-      implicit ec: EC): Unit = {
-    def ret(x: Any): A = x.asInstanceOf[A]
-    @tailrec def loop[S](c: MIO[R, S, S2, E, A], s: S): Unit = c match {
-      case stateless: MIOStateless[R, S, S2, E, A] =>
-        import stateless.coerce
-        stateless match {
-          case Pure(a)  => cb.completed(coerce(s), a)
-          case Read()   => cb.completed(coerce(s), ret(r))
-          case Get()    => cb.completed(coerce(s), ret(s))
-          case Exec()   => cb.completed(coerce(s), ret(ec))
-          case Raise(e) => cb.raised(coerce(s), e)
-        }
-
-      case Set(s1)  => cb.completed(s1, ret(()))
-      case Defer(f) => loop(f(), s)
-      case Await(f) => f(cb)
+  def run[R, S1, S2, E, A](calc: MIO[R, S1, S2, E, A],
+                           r: R,
+                           init: S1,
+                           cb: Callback[S2, E, A],
+                           catches: List[Throwable => Unit] = Nil)(implicit ec: EC): Unit = {
+    var cs = catches
+    @tailrec def loop[S](m: MIO[R, S, S2, E, A], s: S): Unit = m match {
+      case simple: MIOSimple[R, S, S2, E, A] => simple.respond(s, r, ec, cb)
+      case Defer(f)                           => loop(f(), s)
+      case Await(f)                           => f(cb)
+      case Catch(c, src) =>
+        cs ::= c
+        loop(src, s)
+      case Uncatch(a, k) =>
+        cs = cs.drop(1)
+        loop(k(a), s)
       case c @ Cont(src, ks, ke) =>
         src match {
-          case Pure(a)  => loop(ks(a), s)
-          case Read()   => loop(ks(ret(r)), s)
-          case Get()    => loop(ks(ret(r)), s)
-          case Set(s1)  => loop(ks(ret(())), s1)
-          case Raise(e) => loop(ke(e), s)
+          case simple: MIOSimple[R, S, c.MidState, c.MidErr, c.MidErr] =>
+            loop(simple.contf(s, r, ec, ks, ke), s)
+          case Catch(c1, src1) =>
+            cs ::= c1
+            loop(src1.cont(a => Uncatch(a, ks), e => Uncatch(e, ke)), s)
+          case Uncatch(a, k) =>
+            cs = cs.drop(1)
+            loop(k(a).cont(ks, ke), s)
           case Defer(f) => loop(f().cont(ks, ke), s)
-          case Exec()   => loop(ks(ret(ec)), s)
-          case c2 @ Cont(src1, ks1, ke1) =>
+          case Cont(src1, ks1, ke1) =>
             loop(src1.cont(a => ks1(a).cont(ks, ke), e => ke1(e).cont(ks, ke)), s)
           case Await(f) =>
             f(new Callback[c.MidState, c.MidErr, c.MidVal] {
-              def raised(state: c.MidState, error: c.MidErr): Unit    = ec.execute(() => run(ke(error), r, state, cb))
-              def completed(state: c.MidState, value: c.MidVal): Unit = ec.execute(() => run(ks(value), r, state, cb))
-              def broken(e: Throwable): Unit                          = cb.broken(e)
+              def raised(state: c.MidState, error: c.MidErr): Unit = ec.execute(() => run(ke(error), r, state, cb, cs))
+              def completed(state: c.MidState, value: c.MidVal): Unit =
+                ec.execute(() => run(ks(value), r, state, cb, cs))
+              def broken(e: Throwable): Unit = {
+                for (c <- cs) c(e)
+                cb.broken(e)
+              }
             })
         }
     }
     try {
       loop(calc, init)
     } catch {
-      case NonFatal(e) => cb.broken(e)
+      case NonFatal(e) =>
+        for (c <- cs) c(e)
+        cb.broken(e)
     }
   }
 
   implicit def calcInstance[R, S, E]: MIOAsyncInstance[R, S, E] = new MIOAsyncInstance[R, S, E]
-//
+
   class MIOAsyncInstance[R, S, E]
       extends cats.Defer[MIO[R, S, S, E, ?]] with StackSafeMonad[MIO[R, S, S, E, ?]] with Async[MIO[R, S, S, E, ?]] {
-    def suspend[A](fa: => MIO[R, S, S, E, A]): MIO[R, S, S, E, A]                             = MIO.defer(fa)
+    def suspend[A](fa: => MIO[R, S, S, E, A]): MIO[R, S, S, E, A]                              = MIO.defer(fa)
     def flatMap[A, B](fa: MIO[R, S, S, E, A])(f: A => MIO[R, S, S, E, B]): MIO[R, S, S, E, B] = fa.flatMap(f)
-    def pure[A](x: A): MIO[R, S, S, E, A]                                                     = MIO.pure(x)
+    def pure[A](x: A): MIO[R, S, S, E, A]                                                       = MIO.pure(x)
 
     def bracketCase[A, B](acquire: MIO[R, S, S, E, A])(use: A => MIO[R, S, S, E, B])(
         release: (A, ExitCase[Throwable]) => MIO[R, S, S, E, Unit]): MIO[R, S, S, E, B] =
-      acquire.flatMap(
-        a =>
-          use(a).cont(
-            b => release(a, ExitCase.Completed) as b,
-            e => release(a, ExitCase.Error(MIOExcept(e))) *> raise(e)
-        ))
+      (acquire, info[R, S]).tupled.flatMap {
+        case (a, (r, s, ec)) =>
+          Catch(
+            e => run(release(a, ExitCase.Error(e)), r, s, Callback.empty)(ec),
+            use(a).cont(
+              b => release(a, ExitCase.Completed) as b,
+              e => release(a, ExitCase.Error(MIOExcept(e))) *> raise(e)
+            )
+          )
+      }
 
     def raiseError[A](e: Throwable): MIO[R, S, S, E, A] = delay(throw e)
 
@@ -159,7 +197,7 @@ object MIO {
       fa.handleWith(e => f(MIOExcept(e)))
 
     def async[A](k: (Either[Throwable, A] => Unit) => Unit): MIO[R, S, S, E, A] =
-      (get[S]: MIO[R, S, S, E, S]) flatMap (s =>
+      get[S] flatMap (s =>
         Await[R, S, E, A](cb =>
           k {
             case Left(MIOExcept(e: E)) => cb.raised(s, e)
@@ -168,9 +206,9 @@ object MIO {
         }))
 
     def asyncF[A](k: (Either[Throwable, A] => Unit) => MIO[R, S, S, E, Unit]): MIO[R, S, S, E, A] =
-      ((get[S], exec[S], read[R, S]).tupled: MIO[R, S, S, E, (S, EC, R)]).flatMap {
-        case (s, ec, r) =>
-          implicit val eci = ec
+      info[R, S].flatMap {
+        case (r, s, e) =>
+          implicit val ec = e
           Await[R, S, E, A] { cb =>
             val mio = k {
               case Left(MIOExcept(e: E)) => cb.raised(s, e)
