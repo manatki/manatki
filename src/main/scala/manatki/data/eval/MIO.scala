@@ -39,8 +39,6 @@ object MIO {
 
   def write[S](s: S)(implicit S: Monoid[S]): MIO[Any, S, S, Nothing, Unit] = update(S.combine(_, s))
 
-  type MIOGetter = MIO[Any, Any, Nothing, Nothing, Nothing]
-
   sealed trait MIOSimple[-R, -S1, +S2, +E, A] extends MIO[R, S1, S2, E, A] {
     private[MIO] def respond(s: S1, r: R, ec: EC, cb: Callback[S2, E, A]): Unit
     private[MIO] def contf[X](s: S1, r: R, ec: EC, f: A => X, h: E => X): X
@@ -206,15 +204,14 @@ object MIO {
 
     def asyncF[A](k: (Either[Throwable, A] => Unit) => MIO[R, S, S, E, Unit]): MIO[R, S, S, E, A] =
       info[R, S].flatMap {
-        case (r, s, e) =>
-          implicit val ec = e
+        case (r, s, ec) =>
           Await[R, S, E, A] { cb =>
             val mio = k {
               case Left(MIOExcept(e: E)) => cb.raised(s, e)
               case Left(exc)             => cb.broken(exc)
               case Right(value)          => cb.completed(s, value)
             }
-            run(mio, r, s, Callback.empty)
+            run(mio, r, s, Callback.empty)(ec)
           }
       }
   }
