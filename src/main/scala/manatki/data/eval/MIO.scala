@@ -2,8 +2,8 @@ package manatki.data.eval
 
 import java.util.concurrent.atomic.AtomicReference
 
-import cats.StackSafeMonad
-import cats.effect.{Async, ExitCase}
+import cats.{StackSafeMonad, effect}
+import cats.effect.{Async, CancelToken, Concurrent, ExitCase}
 import cats.kernel.Monoid
 import cats.syntax.apply._
 import cats.syntax.functor._
@@ -45,6 +45,7 @@ object MIO {
             }(ec))
       }
   }
+  def deferFuture[S, C, A](fut: => Future[A]): MIO[Any, S, S, C, Nothing, A] = defer(fromFuture(fut))
 
   def write[C, S](s: S)(implicit S: Monoid[S]): MIO[Any, S, S, C, Nothing, Unit] = update(S.combine(_, s))
 
@@ -89,9 +90,9 @@ object MIO {
     private[MIO] def contf[X](s: S, r: Any, ec: EC, f: Nothing => X, h: E => X)          = h(e)
   }
 
-  sealed trait MIOBreak[R, I, O, C, E, A] extends MIO[R, I, O, C, E, A] with Next[Nothing, C, Nothing, Nothing]
-  final case class Exception[S, C](exc: Throwable) extends MIOBreak[Any, Any, Nothing, C, Nothing, Nothing]
-  final case class Interrupt[C](cancel: C) extends MIOBreak[Any, Any, Nothing, C, Nothing, Nothing]
+  sealed trait MIOBreak[R, I, O, C, E, A]                                  extends MIO[R, I, O, C, E, A] with Next[Nothing, C, Nothing, Nothing]
+  final case class Exception[S, C](exc: Throwable)                         extends MIOBreak[Any, Any, Nothing, C, Nothing, Nothing]
+  final case class Interrupt[C](cancel: C)                                 extends MIOBreak[Any, Any, Nothing, C, Nothing, Nothing]
   final case class Defer[R, I, O, C, E, A](e: () => MIO[R, I, O, C, E, A]) extends MIO[R, I, O, C, E, A]
   final case class Exec[C, S]() extends MIOSimple[Any, S, S, C, Nothing, EC] {
     private[MIO] def respond(s: S, r: Any, ec: EC, cb: Callback[S, C, Nothing, EC]): Unit = cb.completed(s, ec)
@@ -137,11 +138,34 @@ object MIO {
       calc.cont(f, (void: Nothing) => void)
   }
 
-  trait Callback[-S, -C, -E, -A] {
+  trait Callback[-S, -C, -E, -A] { self =>
     def raised(state: S, error: E): Unit
     def completed(state: S, value: A): Unit
     def broken(exception: Throwable): Unit
     def interrupted(cancel: C): Unit
+    def +[S1 <: S, C1 <: C, E1 <: E, A1 <: A](other: Callback[S1, C1, E1, A1]): Callback[S1, C1, E1, A1] =
+      if (other == Callback.empty) this
+      else if (this == Callback.empty) other
+      else
+        new Callback[S1, C1, E1, A1] {
+          def raised(state: S1, error: E1): Unit = {
+            self.raised(state, error)
+            other.raised(state, error)
+          }
+
+          def completed(state: S1, value: A1): Unit = {
+            self.completed(state, value)
+            other.completed(state, value)
+          }
+          def broken(exception: Throwable): Unit = {
+            self.broken(exception)
+            other.broken(exception)
+          }
+          def interrupted(cancel: C1): Unit = {
+            self.interrupted(cancel)
+            other.interrupted(cancel)
+          }
+        }
   }
   object Callback {
     val empty = new Callback[Any, Any, Any, Any] {
@@ -153,7 +177,7 @@ object MIO {
   }
 
   sealed trait Next[+O, C, +E, +A]
-  case class Stop[C]()                               extends Next[Nothing, C, Nothing, Nothing]
+  case class Stop[C]() extends Next[Nothing, C, Nothing, Nothing]
   object Next {
     implicit def unitToStop[S, C, E, A](x: Unit): Next[S, C, E, A] = Stop()
   }
@@ -252,11 +276,12 @@ object MIO {
     }
   }
 
-  final def runCancelable[R, I, O, C, E, A](mio: MIO[R, I, O, C, E, A])(r: R, init: I)(
-      implicit ec: EC): (Future[Result[O, C, E, A]], C => Unit) = {
+  final def runCancelable[R, I, O, C, E, A](mio: MIO[R, I, O, C, E, A], add: Callback[O, C, E, A] = Callback.empty)(
+      r: R,
+      init: I)(implicit ec: EC): (Future[Result[O, C, E, A]], C => Unit) = {
     val p           = Promise[Result[O, C, E, A]]
     val cancelation = new AtomicReference[C]
-    val cb = new MIO.Callback[O, C, E, A] {
+    val cb = add + new MIO.Callback[O, C, E, A] {
       def raised(state: O, error: E): Unit    = p.success(Failed(state, error))
       def completed(state: O, value: A): Unit = p.success(Finished(state, value))
       def broken(e: Throwable): Unit          = p.failure(e)
@@ -278,11 +303,12 @@ object MIO {
               case Failed(s, e)   => set(s).flatMap(_ => raise(e))
               case Interrupted(c) => Interrupt(c)
             }
-          def cancel[S](cancel: C): MIO[Any, S, S, Nothing, Nothing, Any] = delay(setter(cancel))
+          def cancel[S, C1](cancel: C): MIO[Any, S, S, C1, Nothing, Any] = delay(setter(cancel))
         }
     }
 
-  implicit def calcInstance[R, S, C, E]: MIOAsyncInstance[R, S, C, E] = new MIOAsyncInstance[R, S, C, E]
+  implicit def mioAsyncInstance[R, S, C, E]: MIOAsyncInstance[R, S, C, E] = new MIOAsyncInstance[R, S, C, E]
+  implicit def mioConcurrentInstance[R, S, E]: MIOConcurrentInstance[R, S, E] = new MIOConcurrentInstance[R, S, E]
 
   class MIOAsyncInstance[R, S, C, E]
       extends cats.Defer[MIO[R, S, S, C, E, ?]] with StackSafeMonad[MIO[R, S, S, C, E, ?]]
@@ -335,10 +361,45 @@ object MIO {
       }
   }
 
+  class MIOConcurrentInstance[R, S, E] extends MIOAsyncInstance[R, S, Any, E] with Concurrent[MIO[R, S, S, Any, E, ?]] {
+    type F[A] = MIO[R, S, S, Any, E, A]
+    private def fiberToEffect[A](fib: Fiber[S, Any, E, A]): effect.Fiber[F, A] = new effect.Fiber[F, A] {
+      def cancel: F[Unit] = fib.cancel[S, Any](()).void
+      def join: F[A]      = fib.join
+    }
+
+    def start[A](fa: F[A]): F[effect.Fiber[F, A]] = runConc(fa).map(fiberToEffect)
+
+    def racePair[A, B](fa: F[A], fb: F[B]): F[Either[(A, effect.Fiber[F, B]), (effect.Fiber[F, A], B)]] =
+      (runConc(fa), runConc(fb)).tupled.flatMap {
+        case (fiba, fibb) =>
+          exec[S, Any].flatMap { implicit ec =>
+            Await { cb =>
+              val cba = new Callback[S, Any, E, A] {
+                def raised(state: S, error: E): Unit    = cb.raised(state, error)
+                def completed(state: S, value: A): Unit = cb.completed(state, Left(value -> fiberToEffect(fibb)))
+                def broken(exception: Throwable): Unit  = cb.broken(exception)
+                def interrupted(cancel: Any): Unit      = cb.interrupted(())
+              }
+
+              val cbb = new Callback[S, Any, E, B] {
+                def raised(state: S, error: E): Unit    = cb.raised(state, error)
+                def completed(state: S, value: B): Unit = cb.completed(state, Right(fiberToEffect(fiba) -> value))
+                def broken(exception: Throwable): Unit  = cb.broken(exception)
+                def interrupted(cancel: Any): Unit      = cb.interrupted(())
+              }
+
+              run(fiba.join, (), (), cba)
+              run(fibb.join, (), (), cbb)
+            }
+          }
+      }
+  }
+
   final case class MIOExcept[E](e: E) extends Throwable
 
-  trait Fiber[S, C, E, A] {
+  trait Fiber[S, C, E, A] { self =>
     def join: MIO[Any, Any, S, C, E, A]
-    def cancel[S1](cancel: C): MIO[Any, S1, S1, Nothing, Nothing, Any]
+    def cancel[S1, C1](cancel: C): MIO[Any, S1, S1, C1, Nothing, Any]
   }
 }
