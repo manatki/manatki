@@ -3,7 +3,7 @@ package manatki.data.eval
 import java.util.concurrent.atomic.AtomicReference
 
 import cats.{StackSafeMonad, effect}
-import cats.effect.{Async, CancelToken, Concurrent, ExitCase}
+import cats.effect.{Async, CancelToken, Concurrent, ConcurrentEffect, Effect, ExitCase, IO, SyncIO}
 import cats.kernel.Monoid
 import cats.syntax.apply._
 import cats.syntax.functor._
@@ -182,17 +182,17 @@ object MIO {
     implicit def unitToStop[S, C, E, A](x: Unit): Next[S, C, E, A] = Stop()
   }
 
-  private def reRun[R, I, O, C, E, A](calc: MIO[R, I, O, C, E, A],
+  private def reRun[R, I, O, C, E, A](mio: MIO[R, I, O, C, E, A],
                                       r: R,
                                       init: I,
                                       cb: Callback[O, C, E, A],
                                       cancelation: AtomicReference[C],
                                       catches: List[Catcher[C]] = Nil,
                                       rest: List[Action[C]])(implicit ec: EC): Unit =
-    run(calc, r, init, cb, cancelation, catches, rest)
+    run(mio, r, init, cb, cancelation, catches, rest)
 
   @tailrec def run[R, I, O, C, E, A](
-      calc: MIO[R, I, O, C, E, A],
+      mio: MIO[R, I, O, C, E, A],
       r: R,
       init: I,
       cb: Callback[O, C, E, A] = Callback.empty,
@@ -247,7 +247,7 @@ object MIO {
             }
         }
     val (next, follows): (Next[O, C, E, A], List[Action[C]]) = try {
-      loop(calc, init) -> rest
+      loop(mio, init) -> rest
     } catch {
       case NonFatal(e) =>
         cb.broken(e)
@@ -307,8 +307,9 @@ object MIO {
         }
     }
 
-  implicit def mioAsyncInstance[R, S, C, E]: MIOAsyncInstance[R, S, C, E] = new MIOAsyncInstance[R, S, C, E]
-  implicit def mioConcurrentInstance[R, S, E]: MIOConcurrentInstance[R, S, E] = new MIOConcurrentInstance[R, S, E]
+  implicit def mioAsyncInstance[R, S, C, E]: MIOAsyncInstance[R, S, C, E]        = new MIOAsyncInstance[R, S, C, E]
+  implicit def mioEffectInstance[C, E](implicit ec: EC): MIOEffectInstance[C, E] = new MIOEffectInstance[C, E]
+  implicit def mioConcurrentInstance[R, S, E]: MIOConcurrentInstance[R, S, E]    = new MIOConcurrentInstance[R, S, E] {}
 
   class MIOAsyncInstance[R, S, C, E]
       extends cats.Defer[MIO[R, S, S, C, E, ?]] with StackSafeMonad[MIO[R, S, S, C, E, ?]]
@@ -361,7 +362,23 @@ object MIO {
       }
   }
 
-  class MIOConcurrentInstance[R, S, E] extends MIOAsyncInstance[R, S, Any, E] with Concurrent[MIO[R, S, S, Any, E, ?]] {
+  class MIOEffectInstance[C, E](implicit ec: EC)
+      extends MIOAsyncInstance[Any, Unit, C, E] with Effect[MIO[Any, Unit, Unit, C, E, ?]] {
+    def runAsync[A](mio: MIO[Any, Unit, Unit, C, E, A])(cb: Either[Throwable, A] => IO[Unit]): SyncIO[Unit] =
+      SyncIO {
+        val cbm = new Callback[Unit, C, E, A] {
+          def raised(state: Unit, error: E): Unit    = cb(Left(MIOExcept(error)))
+          def completed(state: Unit, value: A): Unit = cb(Right(value))
+          def broken(exception: Throwable): Unit     = cb(Left(exception))
+          def interrupted(cancel: C): Unit           = ()
+        }
+
+        run(mio, (), (), cbm)
+      }
+
+  }
+
+  trait MIOConcurrentInstance[R, S, E] extends MIOAsyncInstance[R, S, Any, E] with Concurrent[MIO[R, S, S, Any, E, ?]] {
     type F[A] = MIO[R, S, S, Any, E, A]
     private def fiberToEffect[A](fib: Fiber[S, Any, E, A]): effect.Fiber[F, A] = new effect.Fiber[F, A] {
       def cancel: F[Unit] = fib.cancel[S, Any](()).void
@@ -394,6 +411,12 @@ object MIO {
             }
           }
       }
+  }
+
+  class MIOConcurrentEffectInstance[E](implicit ec: EC)
+      extends MIOEffectInstance[Any, E] with MIOConcurrentInstance[Any, Unit, E]
+      with ConcurrentEffect[MIO[Any, Unit, Unit, Any, E, ?]] {
+    def runCancelable[A](fa: MIO[Any, Unit, Unit, Any, E, A])(cb: Either[Throwable, A] => IO[Unit]): SyncIO[CancelToken[MIO[Any, Unit, Unit, Any, E, ?]]] = ???
   }
 
   final case class MIOExcept[E](e: E) extends Throwable
