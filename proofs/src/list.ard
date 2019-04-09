@@ -1,5 +1,7 @@
+\import Logic
 \import Paths
 \import monoid
+\import sets
 
 \data List (A : \Type)
   | nil
@@ -20,11 +22,21 @@
     | nil => idp
     | (:: h la') => pmap (:: h) (assoc la' lb lc)
 
-
   \instance listMonoid {A : \Type}: Monoid (List A)
     | empty => nil
     | combine => List.++
     | left_unit a => idp
     | right_unit => List.++nil
     | associativity  => List.assoc
+}
+
+\data Elem {A : \Type} (e : A) (l : List A)
+  | Here (t : List A) (eq : e :: t = l)
+  | There (h : A) (t : List A) (elem : Elem e t) (eq : h :: t = l) \where {
+  \func here!=there {A B : \Type} (e h : A) (l t1 t2 : List A) (el : Elem e t2)
+                     (eq1 : e :: t1 = l) (eq2 : h :: t2 = l)
+                     (p : Here t1 eq1 = There h t2 el eq2 )  : B =>
+    coe (\lam i => \case p @ i \with { Here _ _ => Unit | There _ _ _ _  => B }) unit right
+
+  \func tail-elem {A : \Type} (e h : A) (l : List A) (elem : Elem e l) : Elem e (h :: l) => There h l elem idp
 }

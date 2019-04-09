@@ -22,11 +22,24 @@ object Calc {
 
   def write[S](s: S)(implicit S: Monoid[S]): Calc[Any, S, S, Nothing, Unit] = update(S.combine(_, s))
 
-  final case class Pure[S, +A](a: A)                                      extends Calc[Any, S, S, Nothing, A]
-  final case class Read[S, R]()                                          extends Calc[R, S, S, Nothing, R]
-  final case class Get[S]()                                               extends Calc[Any, S, S, Nothing, S]
-  final case class Set[S](s: S)                                           extends Calc[Any, Any, S, Nothing, Unit]
-  final case class Raise[S, E](e: E)                                      extends Calc[Any, S, S, E, Nothing]
+  sealed trait CalcRes[-R, -S1, +S2, +E, +A] extends Calc[R, S1, S2, E, A] {
+    def submit[X](r: R, s: S1, ke: (S2, E) => X, ka: (S2, A) => X): X
+  }
+  final case class Pure[S, +A](a: A) extends CalcRes[Any, S, S, Nothing, A] {
+    def submit[X](r: Any, s: S, ke: (S, Nothing) => X, ka: (S, A) => X): X = ka(s, a)
+  }
+  final case class Read[S, R]() extends CalcRes[R, S, S, Nothing, R] {
+    def submit[X](r: R, s: S, ke: (S, Nothing) => X, ka: (S, R) => X): X = ka(s, r)
+  }
+  final case class Get[S]() extends CalcRes[Any, S, S, Nothing, S] {
+    def submit[X](r: Any, s: S, ke: (S, Nothing) => X, ka: (S, S) => X): X = ka(s, s)
+  }
+  final case class Set[S](s: S) extends CalcRes[Any, Any, S, Nothing, Unit] {
+    def submit[X](r: Any, s1: Any, ke: (S, Nothing) => X, ka: (S, Unit) => X): X = ka(s, ())
+  }
+  final case class Raise[S, E](e: E) extends CalcRes[Any, S, S, E, Nothing] {
+    def submit[X](r: Any, s: S, ke: (S, E) => X, ka: (S, Nothing) => X): X = ke(s, e)
+  }
   final case class Defer[R, S1, S2, E, A](e: () => Calc[R, S1, S2, E, A]) extends Calc[R, S1, S2, E, A]
   final case class Cont[R, S1, S2, S3, E1, E2, A, B](
       src: Calc[R, S1, S2, E1, A],
@@ -53,31 +66,31 @@ object Calc {
 
   def run[R, S1, S2, E, A](calc: Calc[R, S1, S2, E, A], r: R, init: S1): (S2, Either[E, A]) =
     calc match {
-      case Pure(a)      => (init.asInstanceOf[S2], Right(a))
-      case Read()       => (init.asInstanceOf[S2], Right(r.asInstanceOf[A]))
-      case Get()        => (init.asInstanceOf[S2], Right(init.asInstanceOf[A]))
-      case set: Set[S2] => (set.s, Right(().asInstanceOf[A]))
-      case Raise(e)     => (init.asInstanceOf[S2], Left(e))
-      case Defer(f)     => run(f(), r, init)
+      case res: CalcRes[R, S1, S2, E, A] =>
+        res.submit(r, init, (s2, e) => (s2, Left(e)), (s2, a) => (s2, Right(a)))
+      case Defer(f) => run(f(), r, init)
       case c @ Cont(src, ks, ke) =>
-        val kee = ke.asInstanceOf[c.MidErr => Calc[R, c.MidState, S2, E, A]]
         src match {
-          case Pure(a)      => run(ks(a), r, init)
-          case Read()       => run(ks(r.asInstanceOf[A]), r, init)
-          case Get()        => run(ks(init.asInstanceOf[A]), r, init)
-          case set: Set[S2] => run(ks(().asInstanceOf[A]), r, set.s)
-          case Raise(e)     => run(kee(e), r, init)
-          case Defer(f)     => run(f().cont(ks, kee), r, init)
+          case res: CalcRes[R, S1, c.MidState, c.MidErr, c.MidState] =>
+            val (sm, next) =
+              res.submit[(c.MidState, Calc[R, c.MidState, S2, E, A])](
+                r,
+                init,
+                (sm, e) => (sm, ke(e)),
+                (sm, a) => (sm, ks(a))
+              )
+            run(next, r, sm)
+          case Defer(f) => run(f().cont(ks, ke), r, init)
           case c2 @ Cont(src1, ks1, ke1) =>
-            val kee1 = ke1.asInstanceOf[c2.MidErr => Calc[R, c2.MidState, c.MidState, E, A]]
-            run(src1.cont(a => ks1(a).cont(ks, kee), e => kee1(e).cont(ks, kee)), r, init)
+            run(src1.cont(a => ks1(a).cont(ks, ke), e => ke1(e).cont(ks, ke)), r, init)
         }
     }
 
   implicit def calcInstance[R, S, E]: CalcFunctorInstance[R, S, E] = new CalcFunctorInstance[R, S, E]
 
   class CalcFunctorInstance[R, S, E]
-      extends MonadError[Calc[R, S, S, E, ?], E] with cats.Defer[Calc[R, S, S, E, ?]] with StackSafeMonad[Calc[R, S, S, E, ?]] {
+      extends MonadError[Calc[R, S, S, E, ?], E] with cats.Defer[Calc[R, S, S, E, ?]]
+      with StackSafeMonad[Calc[R, S, S, E, ?]] {
     def defer[A](fa: => Calc[R, S, S, E, A]): Calc[R, S, S, E, A]                                     = Calc.defer(fa)
     def raiseError[A](e: E): Calc[R, S, S, E, A]                                                      = Calc.raise(e)
     def handleErrorWith[A](fa: Calc[R, S, S, E, A])(f: E => Calc[R, S, S, E, A]): Calc[R, S, S, E, A] = fa.handleWith(f)

@@ -13,11 +13,11 @@ import scala.annotation.tailrec
 import scala.concurrent.{Future, Promise, ExecutionContext => EC}
 import scala.util.control.NonFatal
 
-sealed trait MIO[-R, -I, +O, C, +E, +A] {
-  final def run(r: R, init: I)(implicit ec: EC): Future[Result[O, C, E, A]] =
+sealed trait MIO[-R, -SI, +SO, C, +E, +A] {
+  final def run(r: R, init: SI)(implicit ec: EC): Future[Result[SO, C, E, A]] =
     MIO.runCancelable(this)(r, init)._1
 
-  final def runUnit(init: I)(implicit ev: Unit <:< R, ec: EC) = run((), init)
+  final def runUnit(init: SI)(implicit ev: Unit <:< R, ec: EC) = run((), init)
 }
 
 object MIO {
@@ -57,9 +57,9 @@ object MIO {
   final case class Failed[S, E](state: S, error: E)   extends Result[S, Nothing, E, Nothing]
   final case class Interrupted[C](cancel: C)          extends Result[Nothing, C, Nothing, Nothing]
 
-  sealed trait MIOSimple[-R, -I, +O, C, +E, A] extends MIO[R, I, O, C, E, A] {
-    private[MIO] def respond(s: I, r: R, ec: EC, cb: Callback[O, C, E, A]): Unit
-    private[MIO] def contf[X](s: I, r: R, ec: EC, f: A => X, h: E => X): X
+  sealed trait MIOSimple[-R, -SI, +SO, C, +E, A] extends MIO[R, SI, SO, C, E, A] {
+    private[MIO] def respond(s: SI, r: R, ec: EC, cb: Callback[SO, C, E, A]): Unit
+    private[MIO] def contf[X](s: SI, r: R, ec: EC, f: A => X, h: E => X): X
   }
 
   final case class Pure[S, C, A](a: A) extends MIOSimple[Any, S, S, C, Nothing, A] {
