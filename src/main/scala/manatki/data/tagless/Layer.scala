@@ -8,6 +8,13 @@ trait Layer[P[_, _], A] {
 }
 
 object Layer {
+  trait Fix[P[_, _]] extends Layer[P, Fix[P]]
+
+  def fix[P[_, _]](l: Layer[P, Fix[P]]): Fix[P] =
+    new Fix[P] {
+      def cont[B](pa: P[Fix[P], B]): B = l.cont(pa)
+    }
+
   def functor[P[_, _]: Profunctor]: Functor[Layer[P, ?]] =
     new Functor[Layer[P, ?]] {
       def map[A, C](fa: Layer[P, A])(f: A => C): Layer[P, C] =

@@ -7,6 +7,7 @@ trait ListP[I, A, B] {
 }
 
 object ListP {
+
   implicit def profunctor[I]: Layered[ListP[I, ?, ?]] = new Layered[ListP[I, ?, ?]] {
     def tagless[A, C](f: L[A] => C): ListP[I, A, C] =
       new ListP[I, A, C] {
