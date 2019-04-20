@@ -26,9 +26,6 @@
 
 \func propId {A : \Type} (set : isProp A) : propPath {A} {A} idp => \lam (a a' : A) => set a a'
 
-\data bool
-  | true
-  | false
 
 \func set_equalities_are_equal
   {A : \Type}
