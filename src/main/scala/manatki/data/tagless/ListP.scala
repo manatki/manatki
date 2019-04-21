@@ -1,14 +1,20 @@
 package manatki.data.tagless
 import cats.arrow.Profunctor
+import supertagged._
 
-trait ListP[I, A, B] {
+trait ListP[I, -A, +B] {
   def nil: B
   def cons(head: I, tail: A): B
 }
 
 object ListP {
+  def nil[A, B](implicit lp: ListP[A, B, B]): B                    = lp.nil
+  def cons[A, B](head: A, tail: B)(implicit lp: ListP[A, B, B]): B = lp.cons(head, tail)
 
-  implicit def profunctor[I]: Layered[ListP[I, ?, ?]] = new Layered[ListP[I, ?, ?]] {
+  def range[B](from: Long, to: Long)(implicit lp: ListP[Long, B, B]): B =
+    if (from >= to) nil else cons(from, range[B](from + 1, to))
+
+  implicit def layered[I]: Layered[ListP[I, ?, ?]] = new Layered[ListP[I, ?, ?]] {
     def tagless[A, C](f: L[A] => C): ListP[I, A, C] =
       new ListP[I, A, C] {
         def nil: C =
@@ -29,4 +35,20 @@ object ListP {
         def cons(head: I, tail: (A, C)): (B, D) = (pab.cons(head, tail._1), pcd.cons(head, tail._2))
       }
   }
+
+  implicit class Ops[A](val fixed: Lst[A]) extends AnyVal {
+    def foldr[B](b: B)(f: (A, B) => B): B =
+      fixed.cont[B] {
+        new ListP[A, Lst[A], B] {
+          def nil: B                         = b
+          def cons(head: A, tail: Lst[A]): B = f(head, tail.foldr(b)(f))
+        }
+      }
+  }
+
+  implicit def sumInstance[A](implicit A: Numeric[A]): ListP[A, A @@ SumT, A @@ SumT] =
+    new ListP[A, A @@ SumT, A @@ SumT] {
+      def nil: A @@ SumT                            = tag(A.zero)
+      def cons(head: A, tail: A @@ SumT): A @@ SumT = tag(A.plus(head, tail))
+    }
 }

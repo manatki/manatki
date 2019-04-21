@@ -22,6 +22,9 @@ object Layer {
           def cont[B](pa: P[C, B]): B = fa.cont(pa.lmap(f))
         }
     }
+
+  implicit def construct[P[_, _]](implicit P: Layered[P]): P[Layer.Fix[P], Layer.Fix[P]] = P.construct
+
   implicit def functorInstance[P[_, _]: Profunctor]: Functor[Layer[P, ?]] = functor(Profunctor[P])
 }
 
