@@ -1,7 +1,7 @@
 package manatki.data.cont
 
-import cats.Eval.later
-import cats.{Foldable, Monoid}
+import cats.Eval.{later, now}
+import cats.{Eval, Foldable, Monoid}
 import cats.instances.function._
 import cats.instances.list._
 import cats.instances.stream._
@@ -34,10 +34,10 @@ class ContSuite extends FlatSpec with TimeLimitedTests {
       y <- Cont.range[R](1, x) if (x + y) % mod == 0
     } yield (x, y)
 
-  def listReader[R: Monoid](size: Int): Cont[Int => R, (Int, Int)] =
+  def listReader[R: Monoid](size: Int): Cont[Int => Eval[R], (Int, Int)] =
     for {
       mod <- Cont.get[Int, R]
-      res <- listEffect[Int => R](6, mod)
+      res <- listEffect[Int => Eval[R]](6, mod)
     } yield res
 
   val sumsSum = List.range(1L, 10001L).scan(0L)(_ + _).sum
@@ -46,16 +46,15 @@ class ContSuite extends FlatSpec with TimeLimitedTests {
     assert(listEffect[List[(Int, Int)]](6, 3).runS(p => List(p)) === simpleList)
 
   "reader list" should "be equivalent to straghtforward" in
-    assert(listReader[List[(Int, Int)]](6).runS(p => _ => List(p))(3) === simpleList)
+    assert(listReader[List[(Int, Int)]](6).runS(p => _ => now(List(p)))(3).value === simpleList)
 
   "scan via state" should "yield correct result withoud stack overflow" in
     assert(
       List
         .range(1L, 10001L)
         .traverse[Cont.State[List[Long], Long, ?], Long](x => Cont.state(i => (i + x, i + x)))
-        .runS(l => i => later((l, i)))(0L)
+        .runS(l => i => now(l))(0L)
         .value
-        ._1
         .sum === sumsSum)
 
 }

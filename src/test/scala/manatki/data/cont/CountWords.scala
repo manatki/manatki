@@ -1,9 +1,8 @@
 package manatki.data.cont
 
-import cats.Monad
-import cats.data.{ContT, State}
+import cats.Eval.now
+import cats.data.{ContT, ReaderT, State}
 import cats.effect.{ExitCode, IO, IOApp}
-import cats.instances.function._
 import cats.mtl.MonadState
 import cats.mtl.instances.local._
 import cats.mtl.instances.state._
@@ -11,6 +10,7 @@ import cats.syntax.apply._
 import cats.syntax.flatMap._
 import cats.syntax.foldable._
 import cats.syntax.functor._
+import cats.{Eval, Monad}
 import manatki.data.MonoStr
 import manatki.data.cont.contState._
 
@@ -51,14 +51,22 @@ object CountWords extends IOApp {
   def countWordsState(str: String): Map[String, Int] =
     countWordsM[State[St, ?]](str).runS(start).value.words
 
+  def countWordsContT(str: String): Map[String, Int] =
+    countWordsM[ContT[ReaderT[Eval, St, ?], Map[String, Int], ?]](str)
+      .run(_ => ReaderT(st => now(st.words)))
+      .run(start)
+      .value
   def countWordsCont(str: String): Map[String, Int] =
-    countWordsM[ContT[St => ?, Map[String, Int], ?]](str).run(_ => _.words)(start)
+    countWordsM[Cont.State[Map[String, Int], St, ?]](str)
+      .run(_ => now(st => now(st.words)))
+      .value(start)
+      .value
 
-  def countWordsContX(str: String): Map[String, Int] =
-    countWordsM[ContXT[St => ?, Map[String, Int], ?]](str).run(_ => _.words)(start)
+//  def countWordsContX(str: String): Map[String, Int] =
+//    countWordsM[ContXT[St => ?, Map[String, Int], ?]](str).run(_ => _.words)(start)
 
   def run(args: List[String]): IO[ExitCode] =
     IO(println(countWordsState(getString))) *>
-      IO(println(countWordsContX(getString))) as
+      IO(println(countWordsCont(getString))) as
       ExitCode.Success
 }
