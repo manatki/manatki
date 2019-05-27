@@ -1,5 +1,6 @@
 package manatki
 
+import cats.Functor
 import cats.effect._
 import cats.effect.concurrent.Deferred
 import cats.effect.syntax.effect._
@@ -28,4 +29,17 @@ object fsfs {
       hook        = shutdown.complete(termination.complete(())) *> termination.get
       _           <- F.delay(sys.addShutdownHook(hook.toIO.unsafeRunSync()))
     } yield shutdown.get
+
+  // as requested by S.Mukhorovsky
+  /** performs some action after first element received */
+  implicit class FS2ManatkiStreamOps[F[_], A](val stream: fs2.Stream[F, A]) extends AnyVal {
+    def doAfterHead(action: A => F[Unit])(implicit F: Functor[F]): fs2.Stream[F, A] =
+      stream.pull.uncons1.flatMap { opt =>
+        opt.map {
+          case (head, tail) =>
+            fs2.Stream.eval(action(head) as head) ++ tail
+        }.getOrElse(fs2.Stream.empty).pull.echo
+      }.stream
+  }
+
 }

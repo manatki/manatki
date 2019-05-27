@@ -27,13 +27,11 @@ object Cont {
     def resetS: R      = Cont.resetS(c)
   }
 
-  def apply[R, A](f: (A => R) => R): Cont[R, A] = (g => f(g)): ContS[R, A]
+  def apply[R, A](f: ContS[R, A]): Cont[R, A] = f
 
-  def callCCS[R, A, B](f: (A => Cont[R, B]) => Cont[R, A]): Cont[R, A] =
-    k => f(a => _ => k(now(a))).run(k)
+  def callCCS[R, A, B](c: CallCCS[R, A, B]): Cont[R, A] = c
 
-  def callCC[R, A, B](f: (Eval[A] => Cont[R, B]) => Cont[R, A]): Cont[R, A] =
-    k => f(a => _ => k(a)).run(k)
+  def callCC[R, A, B](c: CallCC[R, A, B]): Cont[R, A] = c
 
   /** Reader / State like operation */
   def get[S, R]: State[R, S, S] = Cont(k => e => k(e)(e))
@@ -48,8 +46,8 @@ object Cont {
   def put[S, R](s: S): State[R, S, Unit] =
     k => now(_ => defer(k(Eval.now(()))).flatMap(g => g(s)))
 
-  def shift[A, R](f: (Eval[A] => Eval[R]) => Cont[R, R]): Cont[R, A] = k => later(f).flatMap(ff => reset(ff(k)))
-  def shiftS[A, R](f: (A => R) => Cont[R, R]): Cont[R, A]            = Cont(k => resetS(f(k)))
+  def shift[A, R](c: Shift[R, A]): Cont[R, A]   = c
+  def shiftS[A, R](c: ShiftS[R, A]): Cont[R, A] = c
 
   def reset[R](c: Cont[R, R]): Eval[R] = c.run(identity)
   def resetS[R](c: Cont[R, R]): R      = c.runS(identity)
@@ -77,6 +75,26 @@ object Cont {
     override def flatMap[A, B](fa: Cont[R, A])(f: A => Cont[R, B]): Cont[R, B] =
       k => now(fa).flatMap(_.run(_.flatMap(a => f(a).run(k))))
     override def pure[A](x: A): Cont[R, A] = f => f(now(x))
+  }
+
+  abstract class CallCCS[R, A, B] extends ContS[R, A] {
+    def ccs(k: A => Cont[R, B]): Cont[R, A]
+    def runStrict(k: A => R): R = ccs(a => Cont(_ => k(a))).runS(k)
+  }
+
+  abstract class CallCC[R, A, B] extends Cont[R, A] {
+    def cc(k: Eval[A] => Cont[R, B]): Cont[R, A]
+    def run(k: Eval[A] => Eval[R]): Eval[R] = cc(a => _ => k(a)).run(k)
+  }
+
+  abstract class Shift[R, +A] extends Cont[R, A] {
+    def shift(f: Eval[A] => Eval[R]): Cont[R, R]
+    def run(k: Eval[A] => Eval[R]): Eval[R] = defer(reset(shift(k)))
+  }
+
+  abstract class ShiftS[R, +A] extends ContS[R, A] {
+    def shiftS(f: A => R): Cont[R, R]
+    def runStrict(k: A => R): R = resetS(shiftS(k))
   }
 
   class ContStateMonad[S, R] extends ContMonad[S => Eval[R]] with MonadState[State[R, S, ?], S] {
