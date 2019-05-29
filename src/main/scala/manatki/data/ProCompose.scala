@@ -1,5 +1,5 @@
 package manatki.data
-import cats.arrow.Profunctor
+import cats.arrow.{Category, Profunctor}
 import cats.syntax.profunctor._
 
 sealed trait ProCompose[P[_, _], Q[_, _], A, B] {
@@ -42,13 +42,13 @@ object ProTrans {
   }
 }
 
-trait ProMonad[P[_, _]] { pm =>
-  def andThen[A, B, C](pab: P[A, B], pbc: P[B, C]): P[A, B]
+trait ProMonad[P[_, _]] extends Category[P] { pm =>
+  def compose[A, B, C](pbc: P[B, C], pab: P[A, B]): P[A, C]
   def lift[A, B](f: A => B): P[A, B]
   def id[A]: P[A, A] = lift(identity)
 
   def flatten: ProTrans[ProCompose[P, P, ?, ?], P] = new ProTrans[ProCompose[P, P, ?, ?], P] {
-    def apply[A, B](pp: ProCompose[P, P, A, B]): P[A, B] = pm.andThen(pp.pam, pp.qmb)
+    def apply[A, B](pp: ProCompose[P, P, A, B]): P[A, B] = pm.compose(pp.qmb, pp.pam)
   }
   def unit: ProTrans[? => ?, P] = new ProTrans[? => ?, P] {
     def apply[A, B](f: A => B): P[A, B] = pm.lift(f)
