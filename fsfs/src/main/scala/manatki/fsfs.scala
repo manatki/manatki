@@ -32,7 +32,7 @@ object fsfs {
 
   // as requested by S.Mukhorovsky
   /** performs some action after first element received */
-  implicit class FS2ManatkiStreamOps[F[_], A](val stream: fs2.Stream[F, A]) extends AnyVal {
+  implicit class FS2ManatkiStreamOps[F[_], A](val stream: fs2.Stream[F, A]) {
     def doAfterHead(action: A => F[Unit])(implicit F: Functor[F]): fs2.Stream[F, A] =
       stream.pull.uncons1.flatMap { opt =>
         opt.map {
@@ -41,5 +41,4 @@ object fsfs {
         }.getOrElse(fs2.Stream.empty).pull.echo
       }.stream
   }
-
 }
