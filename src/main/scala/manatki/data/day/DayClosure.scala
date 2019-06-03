@@ -1,5 +1,4 @@
 package manatki.data.day
-import cats.arrow.FunctionK
 import cats.{Eval, ~>}
 
 trait DayClosure[F[_], G[_], A] {
