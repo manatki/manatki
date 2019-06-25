@@ -13,7 +13,7 @@ val monixVersion       = "3.0.0-RC2"
 val akkaVersion     = "2.5.19"
 val akkaHttpVersion = "10.1.3"
 
-val fs2Version = "1.0.3"
+val fs2Version = "1.0.4"
 
 val drosteVersion = "0.6.0"
 

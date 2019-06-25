@@ -1,13 +1,10 @@
 package manatki.data.cont
 
-import cats.Eval.{later, now}
-import cats.{Defer, Eval, Monad, MonadError, StackSafeMonad}
 import cats.data.ContT
 import cats.mtl.{ApplicativeLocal, MonadState}
-import cats.syntax.flatMap._
-import cats.syntax.functor._
-import cats.syntax.apply._
 import cats.syntax.applicative._
+import cats.syntax.flatMap._
+import cats.{Defer, Monad, MonadError, StackSafeMonad}
 
 object contState {
   implicit def conttStateError[F[_]: Monad, R, X](
