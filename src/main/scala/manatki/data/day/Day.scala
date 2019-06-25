@@ -39,7 +39,7 @@ object Day extends DayInstances1 {
     def apply[G[_], A](ga: G[A]): Day[F, G, A] = Day.combine(app.unit, ga)((_, a) => a)
   }
 
-  def zip[F[_]: Functor, G[_]: Functor, A](dfg: Day[Cofree[F, ?], Cofree[G, ?], A]): Cofree[Day[F, G, ?], A] =
+  def zip[F[_], G[_], A](dfg: Day[Cofree[F, ?], Cofree[G, ?], A]): Cofree[Day[F, G, ?], A] =
     Cofree(dfg.comb(dfg.fx.head, dfg.gy.head).value,
            (dfg.fx.tail, dfg.gy.tail).mapN((fx, gy) => Day(fx, gy)((x, y) => Eval.later(zip(Day(x, y)(dfg.comb))))))
 
