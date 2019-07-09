@@ -1,11 +1,13 @@
 package manatki.data.day
 
 import cats._
+import cats.free.Cofree
 import cats.syntax.apply._
 import cats.syntax.coflatMap._
 import cats.syntax.comonad._
 import cats.syntax.functor._
 import cats.syntax.semigroupal._
+import manatki.syntax.functionK
 
 trait Day[F[_], G[_], A] {
   type X
@@ -38,7 +40,16 @@ object Day extends DayInstances1 {
     def apply[G[_], A](ga: G[A]): Day[F, G, A] = Day.combine(app.unit, ga)((_, a) => a)
   }
 
-  private class Impl[F[_], G[_], XX, YY, A](val fx: F[XX], val gy: G[YY], val comb: (XX, YY) => Eval[A]) extends Day[F, G, A] {
+  def zip[F[_], G[_], A](dfg: Day[Cofree[F, ?], Cofree[G, ?], A]): Cofree[Day[F, G, ?], A] =
+    Cofree(dfg.comb(dfg.fx.head, dfg.gy.head).value,
+           (dfg.fx.tail, dfg.gy.tail).mapN((fx, gy) => Day(fx, gy)((x, y) => Eval.later(zip(Day(x, y)(dfg.comb))))))
+
+
+  def zipK[F[_], G[_]]: Day[Cofree[F, ?], Cofree[G, ?], ?] ~> Cofree[Day[F, G, ?], ?] =
+    functionK[Day[Cofree[F, ?], Cofree[G, ?], ?]](zip)
+
+  private class Impl[F[_], G[_], XX, YY, A](val fx: F[XX], val gy: G[YY], val comb: (XX, YY) => Eval[A])
+      extends Day[F, G, A] {
     type X = XX
     type Y = YY
     override def mapKFirst[H[_]](fk: F ~> H): Day[H, G, A]  = Day(fk(fx), gy)(comb)
@@ -57,7 +68,8 @@ object Day extends DayInstances1 {
       }
   }
 
-  class DayApplicative[F[_]: InvariantMonoidal, G[_]: InvariantMonoidal] extends DayApply[F, G] with Applicative[Day[F, G, ?]] {
+  class DayApplicative[F[_]: InvariantMonoidal, G[_]: InvariantMonoidal]
+      extends DayApply[F, G] with Applicative[Day[F, G, ?]] {
     override val unit: Day[F, G, Unit] =
       Day[F, G, Unit, Unit, Unit](InvariantMonoidal[F].unit, InvariantMonoidal[G].unit)((_, _) => Eval.now(()))
     override def pure[A](x: A): Day[F, G, A] = map(unit)(_ => x)
@@ -74,7 +86,8 @@ object Day extends DayInstances1 {
 }
 
 sealed trait DayInstances1 extends DayInstances2 { self: Day.type =>
-  implicit def applicative[F[_]: InvariantMonoidal, G[_]: InvariantMonoidal, A]: Applicative[Day[F, G, ?]] = new DayApplicative
+  implicit def applicative[F[_]: InvariantMonoidal, G[_]: InvariantMonoidal, A]: Applicative[Day[F, G, ?]] =
+    new DayApplicative
 }
 
 sealed trait DayInstances2 extends DayInstances3 { self: Day.type =>
