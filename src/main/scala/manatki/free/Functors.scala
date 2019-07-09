@@ -5,10 +5,10 @@ import cats.{Applicative, Functor, Monad, StackSafeMonad, ~>}
 import manatki.control.Selective
 import manatki.syntax.functionK
 
+
 trait Capture1[-K[_[_]], A] {
   def continue[F[_]](k: K[F]): F[A]
 }
-
 trait PureE[-F[_], G[_]]        extends FunK[F, G] with Pure[G]
 trait FunctorE[-F[_], G[_]]     extends FunK[F, G] with Functor[G]
 trait ApplicativeE[-F[_], G[_]] extends FunctorE[F, G] with PureE[F, G] with Applicative[G]

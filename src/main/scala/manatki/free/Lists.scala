@@ -4,13 +4,11 @@ import cats.data.NonEmptyList
 import cats.instances.list._
 import cats.syntax.foldable._
 import cats.syntax.reducible._
-import cats.{Applicative, Functor, Monad, Monoid, Semigroup}
-import manatki.control.Selective
+import cats.{Monoid, Semigroup}
 
 trait Capture[-T[_]] {
   def continue[A](k: T[A]): A
 }
-
 trait PointedE[-A, B]   extends (A => B) { def empty: B }
 trait SemigroupE[-A, B] extends Semigroup[B] with (A => B)
 trait MonoidE[-A, B]    extends Monoid[B] with SemigroupE[A, B] with PointedE[A, B]
