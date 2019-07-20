@@ -13,9 +13,9 @@ import cats.syntax.applicative._
 import cats.syntax.functor._
 
 trait Caching[T[_[_]], F[_]] {
-  def put: T[Put[F, ?]]
-  def read: T[Get[F, ?]]
-  def delete: T[Delete[F, ?]]
+  def put: T[Put[F, *]]
+  def read: T[Get[F, *]]
+  def delete: T[Delete[F, *]]
 }
 
 object Caching {
@@ -26,8 +26,8 @@ object Caching {
 
   def cached[T[_[_]]: ApplyK, F[_]: Monad](instance: T[F], caching: Caching[T, F]): T[F] =
     instance
-      .productK[Put[F, ?]](caching.put)
-      .productK[Get[F, ?]](caching.read)
+      .productK[Put[F, *]](caching.put)
+      .productK[Get[F, *]](caching.read)
       .mapK(
         functionK.apply(ttk => OptionT(ttk.second).getOrElseF(ttk.first.first.flatTap(ttk.first.second)))
       )
@@ -49,8 +49,8 @@ object ReadFooService {
     } yield
       new Caching[ReadFooService, F] {
         val put    = new ReadFooServicePut(getFooRef, getBarRef)
-        val get    = new ReadFooServiceDelete(getFooRef, getBarRef)
-        val delete = new ReadFooServiceGet(getFooRef, getBarRef)
+        val read   = new ReadFooServiceGet(getFooRef, getBarRef)
+        val delete = new ReadFooServiceDelete(getFooRef, getBarRef)
       }
 
   class ReadFooServicePut[F[_]](getFooRef: Ref[F, Map[String, Long]], getBarRef: Ref[F, Map[(Long, String), String]])

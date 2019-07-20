@@ -45,7 +45,7 @@ scalacOptions ++= Seq(
   "-language:postfixOps"
 )
 
-addCompilerPlugin("org.spire-math"  %% "kind-projector"     % "0.9.3")
+addCompilerPlugin("org.typelevel"   %% "kind-projector"     % "0.10.3")
 addCompilerPlugin("org.scalamacros" % "paradise"            % "2.1.1" cross CrossVersion.patch)
 addCompilerPlugin("com.olegpy"      %% "better-monadic-for" % "0.3.0-M4")
 
