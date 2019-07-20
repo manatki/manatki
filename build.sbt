@@ -4,7 +4,7 @@ version := "0.1"
 
 scalaVersion := "2.12.8"
 
-val catsVersion        = "1.6.0"
+val catsVersion        = "2.0.0-M4"
 val catsEffectVersion  = "1.2.0"
 val catsMtlVersion     = "0.4.0"
 val catsTaglessVersion = "0.5"
@@ -27,6 +27,7 @@ val akkas =
 
 libraryDependencies += "org.typelevel"     %% "cats-core"           % catsVersion
 libraryDependencies += "org.typelevel"     %% "cats-free"           % catsVersion
+libraryDependencies += "org.typelevel"     %% "cats-laws"           % catsVersion
 libraryDependencies += "org.typelevel"     %% "alleycats-core"      % catsVersion
 libraryDependencies += "org.typelevel"     %% "cats-effect"         % catsEffectVersion
 libraryDependencies += "org.typelevel"     %% "cats-mtl-core"       % catsMtlVersion
@@ -65,3 +66,5 @@ libraryDependencies ++= akkas.map(_ % "test")
 
 libraryDependencies += "com.storm-enroute" %% "scalameter"  % "0.10" % "test"
 libraryDependencies += "org.rudogma"       %% "supertagged" % "1.4"
+
+libraryDependencies +=   "org.typelevel" %% "discipline" % "0.10.0"
