@@ -19,40 +19,34 @@ trait CyclicTrain[F[_]] {
 }
 
 object CyclicTrain {
+
   def countWagons[F[_]: Monad](train: CyclicTrain[F]): F[Int] = {
     import train._
     def checkFor(k: Int, sw: Boolean): F[Boolean] =
       (moveForward *> switch(sw)).replicateA(k) *>
         moveBack.replicateA(k) *>
-        (moveBack *> check).replicateA(k).map(_.forall(_ == sw))
+        (check <* moveBack).replicateA(k).map(_.forall(_ == sw)) <*
+        moveForward.replicateA(k)
 
     def checkK(k: Int): F[Boolean] = checkFor(k, true).map2(checkFor(k, false))(_ && _)
 
-    def searchStart(cur: Int): F[Int] =
-      checkK(cur).ifM(searchStart(cur * 2), searchBin(cur, cur * 2))
+    def searchStart(from: Int, to: Int): F[Int] = checkK(to).ifM(searchBin(from, to), searchStart(to, to * 2))
     def searchBin(from: Int, to: Int): F[Int] =
-      if (to - from == 1) from.pure
+      if (to - from == 1) to.pure
       else {
         val mid = (from + to) / 2
-        checkK(mid).ifM(searchBin(mid, to), searchBin(from, mid))
+        checkK(mid).ifM(searchBin(from, mid), searchBin(mid, to))
       }
 
-    searchStart(1)
+    searchStart(0, 1)
   }
 
-  final case class CT(cur: Int, switches: BitSet)
+  type CT = Vector[Boolean]
 
   object cyclicTrainState extends CyclicTrain[State[CT, *]] {
-    private def move(x: Int) =
-      State.modify[CT] { ct =>
-        val n = ct.switches.size
-        ct.copy(cur = (ct.cur + x + n) % n)
-      }
-    def moveForward: State[CT, Unit] = move(1)
-    def moveBack: State[CT, Unit]    = move(-1)
-    def check: State[CT, Boolean]    = State.get[CT] map (ct => ct.switches(ct.cur))
-    def switch(on: Boolean): State[CT, Unit] = State.modify[CT] { ct =>
-      ct.copy(switches = if (on) ct.switches + ct.cur else ct.switches - ct.cur)
-    }
+    def moveForward: State[CT, Unit]         = State.modify { case h +: rest => rest :+ h }
+    def moveBack: State[CT, Unit]            = State.modify { case rest :+ l => l +: rest }
+    def check: State[CT, Boolean]            = State.get map (_.head)
+    def switch(on: Boolean): State[CT, Unit] = State.modify(_.updated(0, on))
   }
 }
