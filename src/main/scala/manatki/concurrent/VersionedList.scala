@@ -20,6 +20,8 @@ import scala.concurrent.duration.{Duration, FiniteDuration}
 
 
 // discussed with Sergey Alaev 27.07.2019 11:11 https://t.me/scala_ru/232132
+// see also shitty versions here https://gist.github.com/Odomontois/085b56654232e5bd3eadfd9b615ad35b
+// and here https://gist.github.com/Odomontois/c98dba3ad27330babf4772bb62173c88
 /** collection of items having incrementing version with ability to wait for new version */
 trait VersionedList[F[_], A] {
   def add(a: A): F[Unit]
