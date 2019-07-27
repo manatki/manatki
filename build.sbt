@@ -5,7 +5,7 @@ version := "0.1"
 scalaVersion := "2.12.8"
 
 val catsVersion        = "2.0.0-M4"
-val catsEffectVersion  = "1.2.0"
+val catsEffectVersion  = "2.0.0-M3"
 val catsMtlVersion     = "0.4.0"
 val catsTaglessVersion = "0.5"
 val monixVersion       = "3.0.0-RC2"
