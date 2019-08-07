@@ -4,7 +4,7 @@
 \import funs
 \import sets
 
-\record TypeConstr (F : \Type  -> \Type)
+\record TypeConstr (F : \Type  -> \Type (\suc \lp))
 
 \class Functor \extends TypeConstr {
   | map : \Pi {A B : \Type} -> F A -> (A -> B)  -> F B

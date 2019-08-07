@@ -2,7 +2,7 @@
 \import funs
 \import monad
 
-\data Freer (F : \Type -> \Type) (A : \Type)
+\data Freer (F : \Type -> \Type) (A : \Type )
   | Pure A
   | FlatMap {B : \Set} (F B) (B -> Freer F A)
 
