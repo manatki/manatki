@@ -36,7 +36,7 @@
   \func here!=there {A B : \Type} (e h : A) (l t1 t2 : List A) (el : Elem e t2)
                      (eq1 : e :: t1 = l) (eq2 : h :: t2 = l)
                      (p : Here t1 eq1 = There h t2 el eq2 )  : B =>
-    coe (\lam i => \case p @ i \with { Here _ _ => Unit | There _ _ _ _  => B }) unit right
+    coe (\lam i => \case p @ i \with { Here _ _ => \Sigma | There _ _ _ _  => B }) () right
 
   \func tail-elem {A : \Type} (e h : A) (l : List A) (elem : Elem e l) : Elem e (h :: l) => There h l elem idp
 }
