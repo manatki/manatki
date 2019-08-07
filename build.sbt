@@ -1,47 +1,32 @@
 name := "manatki"
 
-version := "0.1"
+version in ThisBuild := "0.1"
 
-scalaVersion := "2.12.8"
-
-val catsVersion        = "2.0.0-M4"
-val catsEffectVersion  = "2.0.0-M3"
-val catsMtlVersion     = "0.4.0"
-val catsTaglessVersion = "0.5"
-val monixVersion       = "3.0.0-RC2"
-val monocleVersion     = "1.5.1-cats"
-
-val akkaVersion     = "2.5.19"
-val akkaHttpVersion = "10.1.3"
-
-val fs2Version = "1.0.4"
-
-val drosteVersion = "0.6.0"
-
-val scalaTestVersion  = "3.0.5"
-val scalaCheckVersion = "1.13.4"
-val tofuVersion       = "0.1"
+scalaVersion in ThisBuild := "2.13.0"
 
 val akkas =
-  (Seq("actor", "actor-typed", "stream").map(_ -> akkaVersion) :+ ("http" -> akkaHttpVersion)).map {
+  (List("actor", "actor-typed", "stream").map(_ -> Version.akka) :+ ("http" -> Version.akkaHttp)).map {
     case (module, libVersion) => "com.typesafe.akka" %% s"akka-$module" % libVersion
   }
 
-libraryDependencies += "org.typelevel"              %% "cats-core"           % catsVersion
-libraryDependencies += "org.typelevel"              %% "cats-free"           % catsVersion
-libraryDependencies += "org.typelevel"              %% "cats-laws"           % catsVersion
-libraryDependencies += "org.typelevel"              %% "alleycats-core"      % catsVersion
-libraryDependencies += "org.typelevel"              %% "cats-effect"         % catsEffectVersion
-libraryDependencies += "org.typelevel"              %% "cats-mtl-core"       % catsMtlVersion
-libraryDependencies += "org.typelevel"              %% "cats-tagless-macros" % catsTaglessVersion
-libraryDependencies += "io.monix"                   %% "monix"               % monixVersion
-libraryDependencies += "io.higherkindness"          %% "droste-core"         % drosteVersion
-libraryDependencies += "ru.tinkoff"                 %% "tofu-core"           % tofuVersion
-libraryDependencies += "com.github.julien-truffaut" %% "monocle-macro"       % monocleVersion
-libraryDependencies += "com.github.julien-truffaut" %% "monocle-state"       % monocleVersion
+libraryDependencies += "org.typelevel"              %% "cats-core"           % Version.cats
+libraryDependencies += "org.typelevel"              %% "cats-free"           % Version.cats
+libraryDependencies += "org.typelevel"              %% "cats-laws"           % Version.cats
+libraryDependencies += "org.typelevel"              %% "alleycats-core"      % Version.cats
+libraryDependencies += "org.typelevel"              %% "cats-effect"         % Version.catsEffect
+libraryDependencies += "org.typelevel"              %% "cats-mtl-core"       % Version.catsMtl
+libraryDependencies += "org.typelevel"              %% "cats-tagless-macros" % Version.catsTagless
+//libraryDependencies += "io.higherkindness"          %% "droste-core"         % Version.droste
+libraryDependencies += "ru.tinkoff"                 %% "tofu-core"           % Version.tofu
+libraryDependencies += "ru.tinkoff"                 %% "tofu-concurrent"     % Version.tofu
+libraryDependencies += "ru.tinkoff"                 %% "tofu-optics-core"    % Version.tofu
+//libraryDependencies += "ru.tinkoff"                 %% "tofu-optics-interop" % Version.tofu
+libraryDependencies += "com.github.julien-truffaut" %% "monocle-macro"       % Version.monocle
+libraryDependencies += "com.github.julien-truffaut" %% "monocle-state"       % Version.monocle
 
-scalacOptions in ThisBuild ++= Seq(
-  "-Ypartial-unification",
+//libraryDependencies += "io.monix"                   %% "monix"               % Version.monix
+scalacOptions in ThisBuild ++= List(
+  "-Ymacro-annotations",
   "-deprecation",
   "-feature",
   "-language:existentials",
@@ -52,20 +37,19 @@ scalacOptions in ThisBuild ++= Seq(
 )
 
 lazy val plugins = List(
-  addCompilerPlugin("org.typelevel"   %% "kind-projector"     % "0.10.3"),
-  addCompilerPlugin("org.scalamacros" % "paradise"            % "2.1.1" cross CrossVersion.patch),
-  addCompilerPlugin("com.olegpy"      %% "better-monadic-for" % "0.3.0-M4")
+  addCompilerPlugin("org.typelevel"   %% "kind-projector"     % Version.kindProjector),
+  addCompilerPlugin("com.olegpy"      %% "better-monadic-for" % Version.bm4)
 )
 
-val testSettings = Seq(
-  libraryDependencies += "org.scalatest"  %% "scalatest"  % scalaTestVersion  % "test",
-  libraryDependencies += "org.scalacheck" %% "scalacheck" % scalaCheckVersion % "test"
+val testSettings = List(
+  libraryDependencies += "org.scalatest"  %% "scalatest"  % Version.scalaTest  % "test",
+  libraryDependencies += "org.scalacheck" %% "scalacheck" % Version.scalaCheck % "test"
 )
 
 lazy val akka = project.settings(libraryDependencies ++= akkas)
 
 lazy val fsfs = project
-  .settings(libraryDependencies += "co.fs2" %% "fs2-core" % fs2Version)
+  .settings(libraryDependencies += "co.fs2" %% "fs2-core" % Version.fs2)
   .settings(testSettings)
 
 lazy val problems = project
@@ -75,10 +59,8 @@ lazy val problems = project
 
 lazy val manatki = project.in(file(".")).settings(plugins)
 
-libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.4" % "test"
+testSettings
+
 libraryDependencies ++= akkas.map(_ % "test")
 
-libraryDependencies += "com.storm-enroute" %% "scalameter"  % "0.10" % "test"
-libraryDependencies += "org.rudogma"       %% "supertagged" % "1.4"
-
-libraryDependencies += "org.typelevel" %% "discipline" % "0.10.0"
+libraryDependencies += "org.typelevel" %% "discipline-core" % Version.discipline

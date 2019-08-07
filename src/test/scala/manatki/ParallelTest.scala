@@ -2,8 +2,8 @@ package manatki
 import cats.{ApplicativeError, MonadError}
 import cats.data.NonEmptyList
 import org.scalatest.Matchers
-import manatki.syntax.paralleled._
-import manatki.syntax.splitting._
+import tofu.syntax.paralleled._
+import tofu.syntax.splitting._
 import cats.syntax.either._
 import cats.instances.either._
 import cats.instances.parallel._
@@ -11,6 +11,7 @@ import cats.instances.list._
 import cats.syntax.applicative._
 import cats.syntax.monadError._
 import org.scalatest.WordSpec
+import tofu.parallel.Paralleled
 
 class ParallelTest extends WordSpec with Matchers {
 

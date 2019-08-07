@@ -5,7 +5,8 @@ import cats.evidence.Is
 import cats.syntax.applicative._
 import cats.syntax.flatMap._
 import cats.syntax.parallel._
-import manatki.Paralleled
+import tofu.syntax.splitting._
+import tofu.parallel.Paralleled
 import manatki.data.ParKleisli.{Single, Split}
 
 sealed trait ParKleisli[F[_], A, B] {
@@ -20,8 +21,6 @@ sealed trait ParKleisli[F[_], A, B] {
 }
 
 object ParKleisli {
-  import manatki.paralleledConversion._
-
   final case class Single[F[_], A, B](fab: A => F[B]) extends ParKleisli[F, A, B] {
     def forceRun(a: A)(implicit FP: Paralleled[F]): F[B] = fab(a)
 
@@ -38,7 +37,7 @@ object ParKleisli {
   final case class Split[F[_], A, B, C, D](first: ParKleisli[F, A, B], second: ParKleisli[F, C, D])
       extends ParKleisli[F, (A, C), (B, D)] {
     def forceRun(a: (A, C))(implicit FP: Paralleled[F]): F[(B, D)] =
-      (first.forceRun(a._1), second.forceRun(a._2)).parTupled
+      first.forceRun(a._1).parProduct(second.forceRun(a._2))
 
     protected[data] def andThen[X](next: ParKleisli[F, (B, D), X])(implicit F: Monad[F]) =
       next.composeSplit(this, Is.refl)

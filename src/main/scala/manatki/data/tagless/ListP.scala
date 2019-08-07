@@ -1,6 +1,5 @@
 package manatki.data.tagless
 import cats.arrow.Profunctor
-import supertagged._
 
 trait ListP[I, -A, +B] {
   def nil: B
@@ -46,9 +45,5 @@ object ListP {
       }
   }
 
-  implicit def sumInstance[A](implicit A: Numeric[A]): ListP[A, A @@ SumT, A @@ SumT] =
-    new ListP[A, A @@ SumT, A @@ SumT] {
-      def nil: A @@ SumT                            = tag(A.zero)
-      def cons(head: A, tail: A @@ SumT): A @@ SumT = tag(A.plus(head, tail))
-    }
+
 }
