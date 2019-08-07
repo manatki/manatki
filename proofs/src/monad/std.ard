@@ -50,7 +50,7 @@
   | associativity fa f g => functExt (\lam s => XM.associativity (fa s) (\lam sa => f sa.2 sa.1) (\lam sb => g sb.2 sb.1) )
 
 \func writMonFM' {W A B : \Set} {X : \Set -> \Set} (XM : Monad X) {wmon : Monoid W} (f : A -> XM.F (\Sigma W B) ) (wa : \Sigma W A) =>
-  XM.map (f wa.2) (\lam wb => (wa.1 |+| wb.1, wb.2))
+  XM.map  (\lam (wb : \Sigma W B) => (wa.1 |+| wb.1, wb.2)) (f wa.2)
 
 \data WriterT (X W : \Set) | WriterT
 

@@ -1,28 +1,32 @@
+\import Equiv
+\import Function
 \import Paths
-\import funs
 \import monad
 
-\data Freer (F : \Type -> \Type) (A : \Type )
-  | Pure A
-  | FlatMap {B : \Set} (F B) (B -> Freer F A)
+\data Freer  (F : \Type -> \Type ) (A : \Type )
+  | Purer A
+  | FlatMap  {B : \Type} (F B) (B -> Freer F A )
 
-\instance freerMonad {F : \Type -> \Type}: Monad (Freer F)
-  | pure => Pure {F}
+\instance freerMonad  {F : \Type  -> \Type }:  Monad (Freer  F )
+  | pure => Purer \lp {F}
   | flatMap => flatMapImpl {F}
   | left_unit a f => idp
   | right_unit  => rightUnitImpl {F}
   | associativity => assocImpl {F}
   \where {
-    \func flatMapImpl {F : \Type -> \Type} {A B : \Type} (fa : Freer F A) (f : A -> Freer F B) : Freer F B \elim fa
-      | Pure a => f a
+    \func flatMapImpl {F : \Type -> \Type } {A B : \Type} (fa : Freer F A) (f : A -> Freer F B) : Freer F B  \elim fa
+      | Purer a => f a
       | FlatMap {C} fc k => FlatMap fc (\lam c => flatMapImpl (k c) f)
 
-    \func rightUnitImpl {F : \Type -> \Type} {A : \Type} (fa : Freer F A): flatMapImpl fa Pure = fa \elim fa
-      | Pure a => idp
+    \func rightUnitImpl {F : \Type -> \Type} {A : \Type} (fa : Freer F A): flatMapImpl fa Purer = fa \elim fa
+      | Purer a => idp
       | FlatMap {B} fb f => path (\lam i => FlatMap fb (\lam b => rightUnitImpl (f b) @ i  ) )
 
     \func assocImpl {F : \Type -> \Type} {A B C : \Type} (fa : Freer F A) (f : A -> Freer F B) (g : B -> Freer F C) :
       flatMapImpl fa (\lam a => flatMapImpl (f a) g) = flatMapImpl (flatMapImpl fa f) g \elim fa
-      | Pure fa => idp
+      | Purer fa => idp
       | FlatMap {B} fb h => path (\lam i => FlatMap fb (\lam b => assocImpl (h b)  f g @ i))
   }
+
+
+--\func Free (F : \Type -> \Type) (A : \Type) => \Pi (G : \Type -> \Type ) -> QEquiv (NatTrans F G) (MonadMorph Fk G)
