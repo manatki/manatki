@@ -6,8 +6,8 @@
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/.bin" />
     </content>
-    <orderEntry type="inheritedJdk" />
+    <orderEntry type="jdk" jdkName="arend" jdkType="ArendSdkType" />
     <orderEntry type="sourceFolder" forTests="false" />
-    <orderEntry type="module" module-name="arend-lib" />
+    <orderEntry type="library" name="arend-lib" level="project" />
   </component>
 </module>

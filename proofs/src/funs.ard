@@ -1,4 +1,0 @@
-\func id {A : \Type} (x : A) => x
-\func \infixr 6 ~ {A B C : \Type } (f : B -> C) ( g : A -> B) (x : A) => f (g x)
-\func const {A B : \Type} (b : B) (a : A) => b
-\func flip {A B C : \Type } (f : A -> B -> C)(b : B)(a : A) => f a b
