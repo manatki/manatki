@@ -49,7 +49,7 @@ val testSettings = List(
 lazy val akka = project.settings(libraryDependencies ++= akkas)
 
 lazy val fsfs = project
-  .settings(libraryDependencies += "co.fs2" %% "fs2-core" % Version.fs2)
+  .settings(libraryDependencies += ("co.fs2" %% "fs2-core" % Version.fs2) withSources() )
   .settings(testSettings)
 
 lazy val problems = project

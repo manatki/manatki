@@ -1,6 +1,6 @@
 package manatki
 
-import cats.Functor
+import cats.{Functor, Order}
 import cats.effect._
 import cats.effect.concurrent.Deferred
 import cats.effect.syntax.effect._
@@ -10,7 +10,7 @@ import cats.syntax.functor._
 import cats.syntax.option._
 import fs2._
 
-object fsfs {
+package object fsfs {
   def zipWithHeader[F[_], A]: Pipe[F, A, (A, A)] =
     _.mapAccumulate(none[A]) {
       case (None, header)            => (header.some, none[(A, A)])
@@ -41,4 +41,6 @@ object fsfs {
         }.getOrElse(fs2.Stream.empty).pull.echo
       }.stream
   }
+
+
 }
