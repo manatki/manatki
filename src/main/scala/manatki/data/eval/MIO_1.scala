@@ -9,7 +9,6 @@ import scala.concurrent.{Future, Promise, ExecutionContext => EC}
 import scala.util.control.NonFatal
 import cats.syntax.functor._
 import cats.syntax.apply._
-import com.sun.org.glassfish.external.amx.MBeanListener.Callback
 
 sealed trait MIO_1[-R, S, +E, +A] {
   final def run(r: R, init: S)(implicit ec: EC): Future[(S, Either[E, A])] = {
