@@ -1,5 +1,8 @@
 package manatki.data.layer
+import manatki.data.layer.Layer1.FlatMap
 import manatki.data.layer.LayerEffects._
+
+import scala.annotation.tailrec
 
 abstract class Layer1[-P[-i[_], +o[_]], A] {
   type LP[a] <: Layer1[P, a]
@@ -17,28 +20,26 @@ object Layer1 {
     def flatMap[B](f: A => Layer1[P, B]): Layer1[FM, B] = FlatMap[FM, A, B](l, f)
   }
 
+  private object ValueEval extends EvalPI[Eval, Eval] {
+    def pure[A](a: A): Eval[A] = Pure(a)
+    def flatMap[A, B](fx: Eval[A], f: A => Eval[B]): Eval[B] =
+      fx match {
+        case Pure(a) => f(a)
+        case e2      => e2.unpack(new ValueFlatMapEval[B])(f)
+      }
+  }
+
+  private class ValueFlatMapEval[R] extends EvalPI[Eval, Lambda[a => (a => Eval[R]) => Eval[R]]] {
+    def pure[A](a: A) = f => f(a)
+    def flatMap[A, B](fu: LayerEffects.Eval[A], g: A => LayerEffects.Eval[B]) =
+      f => FlatMap[EvalP, A, R](fu, u => FlatMap(g(u), f))
+  }
+
   implicit class EvalOps[A](private val ev: Layer1[EvalP, A]) extends AnyVal {
-    def value: A = ev match {
-      case Pure(a)                   => a
-      case fm @ FlatMap(start, cont) => cont(start).value
-      case e1 =>
-        val res = e1.unpack[Eval](new EvalPI[Eval, Eval] {
-          def pure[X](a: X): Eval[X] = Pure(a)
-          def flatMap[X, Y](fx: Eval[X], f: X => Eval[Y]): Eval[Y] =
-            fx match {
-              case Pure(a) => f(a)
-              case e2 =>
-                e2.unpack[Lambda[a => (a => Eval[Y]) => Eval[Y]]](
-                    new EvalPI[Eval, Lambda[a => (a => Eval[Y]) => Eval[Y]]] {
-                      def pure[U](a: U) = f => f(a)
-                      def flatMap[U, V](fu: LayerEffects.Eval[U], g: U => LayerEffects.Eval[V]) =
-                        f => FlatMap[EvalP, U, Y](fu, u => FlatMap[EvalP, V, Y](g(u), f))
-                    }
-                  )
-                  .apply(f)
-            }
-        })
-        res.value
+    @tailrec def value: A = ev match {
+      case Pure(a)              => a
+      case FlatMap(start, cont) => cont(start).value
+      case e1                   => e1.unpack(ValueEval).value
     }
   }
 
