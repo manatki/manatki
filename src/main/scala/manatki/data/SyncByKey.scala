@@ -13,7 +13,7 @@ import tofu.concurrent._
 import tofu.concurrent.syntax.ref._
 import manatki.syntax.functionK
 import tofu.optics.Property
-import tofu.optics.Property.mapItem
+import tofu.optics.functions.mapItem
 
 //discussed with Kirill Shelopugin 2018-02-06 19:18
 /** Synchronizes multiple tasks, sequencing actions for single key */

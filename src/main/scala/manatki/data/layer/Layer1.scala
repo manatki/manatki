@@ -24,8 +24,8 @@ object Layer1 {
     def pure[A](a: A): Eval[A] = Pure(a)
     def flatMap[A, B](fx: Eval[A], f: A => Eval[B]): Eval[B] =
       fx match {
-        case Pure(a) => f(a)
-        case e2      => e2.unpack(new ValueFlatMapEval[B])(f)
+        case Pure(a)        => f(a)
+        case e2             => e2.unpack(new ValueFlatMapEval[B])(f)
       }
   }
 
@@ -37,9 +37,9 @@ object Layer1 {
 
   implicit class EvalOps[A](private val ev: Layer1[EvalP, A]) extends AnyVal {
     @tailrec def value: A = ev match {
-      case Pure(a)              => a
-      case FlatMap(start, cont) => cont(start).value
-      case e1                   => e1.unpack(ValueEval).value
+      case Pure(a)        => a
+      case FlatMap(fx, f) => f(fx).value
+      case e1             => e1.unpack(ValueEval).value
     }
   }
 

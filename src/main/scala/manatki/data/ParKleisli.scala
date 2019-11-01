@@ -1,16 +1,14 @@
 package manatki.data
-import cats.Monad
+import cats.{Monad, Parallel}
 import cats.arrow.Arrow
 import cats.evidence.Is
 import cats.syntax.applicative._
 import cats.syntax.flatMap._
 import cats.syntax.parallel._
-import tofu.syntax.splitting._
-import tofu.parallel.Paralleled
 import manatki.data.ParKleisli.{Single, Split}
 
 sealed trait ParKleisli[F[_], A, B] {
-  def forceRun(a: A)(implicit FP: Paralleled[F]): F[B]
+  def forceRun(a: A)(implicit FP: Parallel[F]): F[B]
 
   protected[data] def andThen[X](next: ParKleisli[F, B, X])(implicit F: Monad[F]): ParKleisli[F, A, X]
 
@@ -22,7 +20,7 @@ sealed trait ParKleisli[F[_], A, B] {
 
 object ParKleisli {
   final case class Single[F[_], A, B](fab: A => F[B]) extends ParKleisli[F, A, B] {
-    def forceRun(a: A)(implicit FP: Paralleled[F]): F[B] = fab(a)
+    def forceRun(a: A)(implicit FP: Parallel[F]): F[B] = fab(a)
 
     protected[data] def andThen[X](next: ParKleisli[F, B, X])(implicit F: Monad[F]): ParKleisli[F, A, X] =
       next.composeSingle(this)
@@ -36,8 +34,8 @@ object ParKleisli {
   }
   final case class Split[F[_], A, B, C, D](first: ParKleisli[F, A, B], second: ParKleisli[F, C, D])
       extends ParKleisli[F, (A, C), (B, D)] {
-    def forceRun(a: (A, C))(implicit FP: Paralleled[F]): F[(B, D)] =
-      first.forceRun(a._1).parProduct(second.forceRun(a._2))
+    def forceRun(a: (A, C))(implicit FP: Parallel[F]): F[(B, D)] =
+      (first.forceRun(a._1), second.forceRun(a._2)).parTupled
 
     protected[data] def andThen[X](next: ParKleisli[F, (B, D), X])(implicit F: Monad[F]) =
       next.composeSplit(this, Is.refl)
@@ -52,7 +50,7 @@ object ParKleisli {
   }
 
   final case class AndThen[F[_], A, B, C](start: ParKleisli[F, A, B], end: ParKleisli[F, B, C]) extends ParKleisli[F, A, C] {
-    def forceRun(a: A)(implicit FP: Paralleled[F]): F[C] =
+    def forceRun(a: A)(implicit FP: Parallel[F]): F[C] =
       FP.monad.flatMap(start.forceRun(a))(end.forceRun)
 
     protected[data] def andThen[X](next: ParKleisli[F, C, X])(implicit F: Monad[F]) =
@@ -63,12 +61,12 @@ object ParKleisli {
 
     protected def composeSplit[X1, Y1, X2, Y2](split: Split[F, X1, Y1, X2, Y2], yisa: Is[(Y1, Y2), A])(
         implicit F: Monad[F]): ParKleisli[F, (X1, X2), C] =
-      AndThen(yisa.substitute[ParKleisli[F, (X1, X2), ?]](split) andThen start, end)
+      AndThen(yisa.substitute[ParKleisli[F, (X1, X2), *]](split) andThen start, end)
 
   }
 
-  implicit def parKleisliArrow[F[_]](implicit FP: Paralleled[F]): Arrow[ParKleisli[F, ?, ?]] =
-    new Arrow[ParKleisli[F, ?, ?]] {
+  implicit def parKleisliArrow[F[_]](implicit FP: Parallel[F]): Arrow[ParKleisli[F, *, *]] =
+    new Arrow[ParKleisli[F, *, *]] {
       implicit val F: Monad[F]                       = FP.monad
       def lift[A, B](f: A => B): ParKleisli[F, A, B] = Single(a => f(a).pure[F])
 

@@ -2,10 +2,11 @@ package manatki
 
 import org.scalatest.{Matchers, WordSpec}
 import org.scalatest.prop.PropertyChecks
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.collection.immutable
 
-class FsFsSuite extends WordSpec with PropertyChecks with Matchers {
+class FsFsSuite extends WordSpec with ScalaCheckPropertyChecks with Matchers {
   "fsfs.zipWithHeader" should {
     "zip with non-empty header" when {
       "stream is non-empty" in forAll {
