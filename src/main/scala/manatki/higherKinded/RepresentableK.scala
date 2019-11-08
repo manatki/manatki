@@ -12,15 +12,17 @@ trait Repr[T[_[_]], A] {
 }
 
 object Repr {
-  type Arb[_]
 
-  def apply[T[_[_]]] = new Applyed[T]
 
-  class Applyed[T[_[_]]] {
-    def apply[A](maker: MakeRepr[T, A]): Repr[T, A] = maker
+  def apply[T[_[_]]] = new Applied[T]
+
+  class Applied[T[_[_]]] {
+    def apply[A](maker: MakeRepr[T, A, Arb]): Repr[T, A] = maker
+
+    type Arb[_]
   }
 
-  abstract class MakeRepr[T[_[_]], A] extends Repr[T, A] {
+  abstract class MakeRepr[T[_[_]], A, Arb[_]] extends Repr[T, A] {
     def applyArbitrary(fk: T[Arb]): Arb[A]
 
     def apply[F[_]](fk: T[F]): F[A] = applyArbitrary(fk.asInstanceOf[T[Arb]]).asInstanceOf[F[A]]

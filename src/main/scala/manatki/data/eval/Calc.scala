@@ -1,15 +1,21 @@
 package manatki.data.eval
 
-import cats.{MonadError, StackSafeMonad}
-import cats.kernel.Monoid
-import cats.syntax.either._
+
+import cats.data.IndexedState
+import cats.effect.ExitCase
+import cats.{MonadError, Monoid, StackSafeMonad}
+import tofu.optics.PContains
+import tofu.optics.PContains
 
 sealed trait Calc[-R, -S1, +S2, +E, +A] {
-  final def run(r: R, init: S1): (S2, Either[E, A])    = Calc.run(this, r, init)
-  final def runUnit(init: S1)(implicit ev: Unit <:< R) = run((), init)
+  final def run(r: R, init: S1): (S2, Either[E, A]) = Calc.run(this, r, init)
+
+  final def runUnit(init: S1)(implicit ev: Unit <:< R): (S2, Either[E, A]) = run((), init)
+  def narrowRead[R1 <: R]: Calc[R1, S1, S2, E, A]                          = this
 }
 
 object Calc {
+  def unit[S]: Calc[Any, S, S, Nothing, Unit]        = Pure(())
   def pure[S, A](a: A): Calc[Any, S, S, Nothing, A]  = Pure(a)
   def read[S, R]: Calc[R, S, S, Nothing, R]          = Read()
   def get[S]: Calc[Any, S, S, Nothing, S]            = Get()
@@ -42,26 +48,61 @@ object Calc {
   }
   final case class Defer[R, S1, S2, E, A](e: () => Calc[R, S1, S2, E, A]) extends Calc[R, S1, S2, E, A]
   final case class Cont[R, S1, S2, S3, E1, E2, A, B](
-      src: Calc[R, S1, S2, E1, A],
-      ksuc: A => Calc[R, S2, S3, E2, B],
-      kerr: E1 => Calc[R, S2, S3, E2, B]
+    src: Calc[R, S1, S2, E1, A],
+    ksuc: A => Calc[R, S2, S3, E2, B],
+    kerr: E1 => Calc[R, S2, S3, E2, B]
   ) extends Calc[R, S1, S3, E2, B] {
     type MidState = S2
     type MidErr   = E1
   }
 
-  implicit class invariantOps[R, S1, S2, E, A](val calc: Calc[R, S1, S2, E, A]) extends AnyVal {
-    def cont[E2, S3, B](f: A => Calc[R, S2, S3, E2, B], h: E => Calc[R, S2, S3, E2, B]): Calc[R, S1, S3, E2, B] =
-      Cont(calc, f, h)
-    def flatMap[B](f: A => Calc[R, S2, S2, E, B]): Calc[R, S1, S2, E, B] = cont(f, raise(_: E))
-    def handleWith(f: E => Calc[R, S2, S2, E, A]): Calc[R, S1, S2, E, A] = cont(pure(_: A), f)
-    def handle(f: E => A): Calc[R, S1, S2, E, A]                         = handleWith(e => pure(f(e)))
-    def map[B](f: A => B): Calc[R, S1, S2, E, B]                         = flatMap(a => pure(f(a)))
+  implicit class invariantOps[R, S1, S2, E, A](private val calc: Calc[R, S1, S2, E, A]) extends AnyVal {
+    def cont[R1 <: R, E2, S3, B](
+      f: A => Calc[R1, S2, S3, E2, B],
+      h: E => Calc[R1, S2, S3, E2, B]
+    ): Calc[R1, S1, S3, E2, B]                                                                 = Cont(calc, f, h)
+    def flatMap[R1 <: R, E1 >: E, B](f: A => Calc[R1, S2, S2, E1, B]): Calc[R1, S1, S2, E1, B] = cont(f, raise(_: E))
+    def >>=[R1 <: R, E1 >: E, B](f: A => Calc[R1, S2, S2, E1, B])                              = flatMap(f)
+    def >>[R1 <: R, E1 >: E, B](c: => Calc[R1, S2, S2, E1, B])                                 = flatMap(_ => c)
+    def handleWith[E1](f: E => Calc[R, S2, S2, E1, A]): Calc[R, S1, S2, E1, A]                 = cont(pure(_: A), f)
+    def handle(f: E => A): Calc[R, S1, S2, E, A]                                               = handleWith(e => pure(f(e)))
+    def map[B](f: A => B): Calc[R, S1, S2, E, B]                                               = flatMap(a => pure(f(a)))
+    def as[B](b: => B): Calc[R, S1, S2, E, B]                                                  = map(_ => b)
+    def mapError[E1](f: E => E1): Calc[R, S1, S2, E1, A]                                       = handleWith(e => Calc.raise(f(e)))
+
+    def focus[S3, S4](lens: PContains[S3, S4, S1, S2]): Calc[R, S3, S4, E, A] =
+      get[S3].flatMapS { s3 =>
+        set(lens.extract(s3)) *>> calc.cont(
+          result => get[S2].flatMapS(s2 => set(lens.set(s3, s2)) *>> pure(result)),
+          err => get[S2].flatMapS(s2 => set(lens.set(s3, s2)) *>> raise(err))
+        )
+      }
   }
 
-  implicit class successfullOps[R, S1, S2, A](val calc: Calc[R, S1, S2, Nothing, A]) extends AnyVal {
-    def flatMapS[S3, B, E](f: A => Calc[R, S2, S3, E, B]): Calc[R, S1, S3, E, B] =
-      calc.cont(f, (void: Nothing) => void)
+  implicit class CalcSuccessfullOps[R, S1, S2, A](private val calc: Calc[R, S1, S2, Nothing, A]) extends AnyVal {
+    final def flatMapS[R1 <: R, S3, B, E](f: A => Calc[R1, S2, S3, E, B]): Calc[R1, S1, S3, E, B] =
+      calc.cont(f, identity)
+    final def productRS[R1 <: R, S3, B, E](r: => Calc[R1, S2, S3, E, B]): Calc[R1, S1, S3, E, B] = flatMapS(_ => r)
+    final def *>>[R1 <: R, S3, B, E](r: => Calc[R1, S2, S3, E, B]): Calc[R1, S1, S3, E, B]       = productRS(r)
+    final def runSuccess(r: R, init: S1): (S2, A) = {
+      val (s2, res) = calc.run(r, init)
+      s2 -> res.merge
+    }
+  }
+
+  implicit class CalcUnsuccessfullOps[R, S1, S2, E](private val calc: Calc[R, S1, S2, E, Nothing]) extends AnyVal {
+    def handleWithS[R1 <: R, E1, S3, B, A](f: E => Calc[R, S2, S3, E1, A]): Calc[R1, S1, S3, E1, A] =
+      calc.cont(identity, f)
+  }
+
+  implicit class CalcFixedStateOps[R, S, E, A](private val calc: Calc[R, S, S, E, A]) extends AnyVal {
+    def when(b: Boolean): Calc[R, S, S, E, Any] = if (b) calc else Calc.unit
+  }
+
+  implicit class CalcSimpleStateOps[S1, S2, A](private val calc: Calc[Any, S1, S2, Nothing, A]) extends AnyVal {
+    final def runSuccessUnit(init: S1): (S2, A) = calc.runSuccess((), init)
+
+    def toState: IndexedState[S1, S2, A] = IndexedState(runSuccessUnit)
   }
 
   def run[R, S1, S2, E, A](calc: Calc[R, S1, S2, E, A], r: R, init: S1): (S2, Either[E, A]) =
@@ -81,7 +122,7 @@ object Calc {
               )
             run(next, r, sm)
           case Defer(f) => run(f().cont(ks, ke), r, init)
-          case c2 @ Cont(src1, ks1, ke1) =>
+          case Cont(src1, ks1, ke1) =>
             run(src1.cont(a => ks1(a).cont(ks, ke), e => ke1(e).cont(ks, ke)), r, init)
         }
     }
@@ -89,12 +130,21 @@ object Calc {
   implicit def calcInstance[R, S, E]: CalcFunctorInstance[R, S, E] = new CalcFunctorInstance[R, S, E]
 
   class CalcFunctorInstance[R, S, E]
-      extends MonadError[Calc[R, S, S, E, ?], E] with cats.Defer[Calc[R, S, S, E, ?]]
-      with StackSafeMonad[Calc[R, S, S, E, ?]] {
+    extends MonadError[Calc[R, S, S, E, *], E] with cats.Defer[Calc[R, S, S, E, *]]
+      with StackSafeMonad[Calc[R, S, S, E, *]] with cats.effect.Bracket[Calc[R, S, S, E, *], E] {
     def defer[A](fa: => Calc[R, S, S, E, A]): Calc[R, S, S, E, A]                                     = Calc.defer(fa)
     def raiseError[A](e: E): Calc[R, S, S, E, A]                                                      = Calc.raise(e)
     def handleErrorWith[A](fa: Calc[R, S, S, E, A])(f: E => Calc[R, S, S, E, A]): Calc[R, S, S, E, A] = fa.handleWith(f)
     def flatMap[A, B](fa: Calc[R, S, S, E, A])(f: A => Calc[R, S, S, E, B]): Calc[R, S, S, E, B]      = fa.flatMap(f)
     def pure[A](x: A): Calc[R, S, S, E, A]                                                            = Calc.pure(x)
+    def bracketCase[A, B](
+      acquire: Calc[R, S, S, E, A]
+    )(use: A => Calc[R, S, S, E, B])(release: (A, ExitCase[E]) => Calc[R, S, S, E, Unit]): Calc[R, S, S, E, B] =
+      acquire.flatMap { a =>
+        use(a).cont(
+          b => release(a, ExitCase.Completed).as(b),
+          e => release(a, ExitCase.Error(e)) >> Calc.raise(e)
+        )
+      }
   }
 }

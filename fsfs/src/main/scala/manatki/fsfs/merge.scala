@@ -9,7 +9,7 @@ object merge {
 
   //discussed with @lmnet89 https://t.me/scala_ru/234449 8.08.2019 10:09
   def ordered[F[_], A, R: Order](f: A => R)(xs: Stream[F, A], ys: Stream[F, A]): Stream[F, A] = {
-    val pull: Pull[F, A, Any] = xs.pull.uncons.flatMap {
+    val pull: Pull[F, A, Unit] = xs.pull.uncons.flatMap {
       case Some((xc, xt)) =>
         ys.pull.uncons.flatMap {
           case None => (Stream.chunk(xc) ++ xt).pull.echo

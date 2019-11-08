@@ -1,6 +1,8 @@
 object Version {
   val cats        = "2.0.0-M4"
 
+  val shapeless        = "2.0.0-M4"
+
   val catsEffect  = "2.0.0-M4"
 
   val catsMtl     = "0.6.0"
@@ -15,7 +17,7 @@ object Version {
 
   val akkaHttp = "10.1.9"
 
-  val fs2 = "1.1.0-M1"
+  val fs2 = "2.0.1"
 
   val droste = "0.7.0"
 
@@ -27,7 +29,7 @@ object Version {
 
   val zio = "1.0.0-RC10-1"
 
-  val kindProjector = "0.10.3"
+  val kindProjector = "0.11.0"
 
   val bm4 = "0.3.0"
 

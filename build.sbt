@@ -2,7 +2,7 @@ name := "manatki"
 
 version in ThisBuild := "0.1"
 
-scalaVersion in ThisBuild := "2.13.0"
+scalaVersion in ThisBuild := "2.13.1"
 
 val akkas =
   (List("actor", "actor-typed", "stream").map(_ -> Version.akka) :+ ("http" -> Version.akkaHttp)).map {
@@ -10,6 +10,7 @@ val akkas =
   }
 
 libraryDependencies += "org.typelevel"              %% "cats-core"           % Version.cats withSources ()
+libraryDependencies += "org.typelevel"              %% "shapeless"           % Version.cats withSources ()
 libraryDependencies += "org.typelevel"              %% "cats-free"           % Version.cats
 libraryDependencies += "org.typelevel"              %% "cats-laws"           % Version.cats
 libraryDependencies += "org.typelevel"              %% "alleycats-core"      % Version.cats
@@ -38,7 +39,7 @@ scalacOptions in ThisBuild ++= List(
 )
 
 lazy val plugins = List(
-  addCompilerPlugin("org.typelevel" %% "kind-projector"     % Version.kindProjector),
+  addCompilerPlugin("org.typelevel" %% "kind-projector"     % Version.kindProjector cross CrossVersion.patch),
   addCompilerPlugin("com.olegpy"    %% "better-monadic-for" % Version.bm4)
 )
 
@@ -50,7 +51,7 @@ val testSettings = List(
 lazy val akka = project.settings(libraryDependencies ++= akkas)
 
 lazy val fsfs = project
-  .settings(libraryDependencies += ("co.fs2" %% "fs2-core" % Version.fs2) withSources ())
+  .settings(libraryDependencies += ("co.fs2" %% "fs2-io" % Version.fs2) withSources ())
   .settings(testSettings)
 
 lazy val problems = project
