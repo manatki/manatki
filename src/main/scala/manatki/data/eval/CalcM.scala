@@ -8,6 +8,8 @@ import manatki.free.FunK
 import tofu.optics.PContains
 import tofu.syntax.monadic._
 
+import scala.annotation.tailrec
+
 sealed trait CalcM[+F[+_], -R, -S1, +S2, +E, +A] {
   def narrowRead[R1 <: R]: CalcM[F, R1, S1, S2, E, A] = this
   def mapK[G[+_]: Functor](fk: FunK[F, G]): CalcM[G, R, S1, S2, E, A]
@@ -186,6 +188,7 @@ object CalcM {
     }
   }
 
+  @tailrec
   def step[F[+_], R, S1, S2, E, A](calc: CalcM[F, R, S1, S2, E, A], r: R, init: S1)(
       implicit F: Functor[F]
   ): StepResult[F, S2, E, A] =
