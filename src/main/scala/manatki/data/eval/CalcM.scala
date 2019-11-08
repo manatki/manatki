@@ -221,17 +221,6 @@ object CalcM {
         }
     }
 
-//  final def mapK[F[+_], G[+_], R, S1, S2, E, A](
-//      calc: CalcM[F, R, S1, S2, E, A]
-//  )(f: F ~> G)(implicit G: Functor[G]): CalcM[G, R, S1, S2, E, A] =
-//    calc match {
-//      case res: CalcMRes[r, s1, s2, e, a] => res
-//      case d: Defer[F, R, S1, S2, E, A]   => Defer(() => mapK(d.runStep())(f))
-//      case p: Provide              => Provide(r, inner.mapK(f))
-//      case Sub(fc)                        => Sub(G.map(f(fc))(_.mapK(f)))
-//      case Cont(src, ksuc, kerr)          => Cont(src.mapK(f), a => ksuc(a).mapK(f), e => kerr(e).mapK(f))
-//    }
-
   implicit def calcInstance[F[+_], R, S, E]: CalcFunctorInstance[F, R, S, E] = new CalcFunctorInstance[F, R, S, E]
 
   class CalcFunctorInstance[F[+_], R, S, E]
