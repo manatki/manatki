@@ -1,7 +1,7 @@
 object Version {
   val cats        = "2.0.0-M4"
 
-  val shapeless        = "2.0.0-M4"
+  val shapeless        = "2.3.3"
 
   val catsEffect  = "2.0.0-M4"
 

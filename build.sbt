@@ -10,7 +10,7 @@ val akkas =
   }
 
 libraryDependencies += "org.typelevel"              %% "cats-core"           % Version.cats withSources ()
-libraryDependencies += "org.typelevel"              %% "shapeless"           % Version.cats withSources ()
+libraryDependencies += "com.chuusai"                %% "shapeless"           % Version.shapeless withSources ()
 libraryDependencies += "org.typelevel"              %% "cats-free"           % Version.cats
 libraryDependencies += "org.typelevel"              %% "cats-laws"           % Version.cats
 libraryDependencies += "org.typelevel"              %% "alleycats-core"      % Version.cats
