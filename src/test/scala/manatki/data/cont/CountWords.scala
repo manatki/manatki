@@ -13,6 +13,7 @@ import cats.syntax.functor._
 import cats.{Eval, Monad}
 import manatki.data.MonoStr
 import manatki.data.cont.contState._
+import manatki.data.eval.stage.Conto
 
 import scala.util.Random
 
@@ -56,18 +57,25 @@ object CountWords extends IOApp {
       .run(_ => ReaderT(st => now(st.words)))
       .run(start)
       .value
+
   def countWordsCont(str: String): Map[String, Int] =
     countWordsM[Cont.State[Map[String, Int], St, *]](str)
       .run(_ => now(st => now(st.words)))
       .value(start)
       .value
 
+  def countWordsConto(str: String): Map[String, Int] =
+    countWordsM[Conto.State[Map[String, Int], St, *]](str)
+      .run(_ => st => Conto.Pure(st.words))(start)
+      .evalue
+
 //  def countWordsContX(str: String): Map[String, Int] =
 //    countWordsM[ContXT[St => ?, Map[String, Int], ?]](str).run(_ => _.words)(start)
 
   def run(args: List[String]): IO[ExitCode] =
-    IO(println(countWordsState(getString))) *>
+    IO(println(countWordsConto(getString))) *>
+      IO(println(countWordsState(getString))) *>
       IO(println(countWordsCont(getString))) *>
-      IO(println(countWordsContT(getString))) as
-      ExitCode.Success
+//      IO(println(countWordsContT(getString))) *> // SO
+      IO(ExitCode.Success)
 }
