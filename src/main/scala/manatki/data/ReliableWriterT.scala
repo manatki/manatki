@@ -28,8 +28,8 @@ final case class ReliableWriterT[F[_], E, W, A](run: F[(W, Either[E, A])]) {
 }
 
 object ReliableWriterT {
-  implicit def instance[F[_], E, W](implicit F: MonadError[F, E], W: Monoid[W]): MonadError[ReliableWriterT[F, E, W, ?], E] =
-    new MonadError[ReliableWriterT[F, E, W, ?], E] {
+  implicit def instance[F[_], E, W](implicit F: MonadError[F, E], W: Monoid[W]): MonadError[ReliableWriterT[F, E, W, *], E] =
+    new MonadError[ReliableWriterT[F, E, W, *], E] {
       override def pure[A](x: A): ReliableWriterT[F, E, W, A] = ReliableWriterT(F.pure((W.empty, Right(x))))
       override def flatMap[A, B](fa: ReliableWriterT[F, E, W, A])(f: A => ReliableWriterT[F, E, W, B]): ReliableWriterT[F, E, W, B] =
         fa.flatMap(f)

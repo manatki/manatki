@@ -14,11 +14,11 @@ trait SemigroupE[-A, B] extends Semigroup[B] with (A => B)
 trait MonoidE[-A, B]    extends Monoid[B] with SemigroupE[A, B] with PointedE[A, B]
 
 object Lists {
-  type FreeSemigroup[+A] = Capture[SemigroupE[A, ?]]
-  type FreeMonoid[+A]    = Capture[MonoidE[A, ?]]
-  type FreePointed[+A]   = Capture[PointedE[A, ?]]
+  type FreeSemigroup[+A] = Capture[SemigroupE[A, *]]
+  type FreeMonoid[+A]    = Capture[MonoidE[A, *]]
+  type FreePointed[+A]   = Capture[PointedE[A, *]]
 
-  def single[A](a: A): Capture[A => ?] = new Capture[A => ?] {
+  def single[A](a: A): Capture[A => *] = new Capture[A => *] {
     def continue[B](k: A => B): B = k(a)
   }
 
@@ -33,17 +33,17 @@ object Lists {
     }
 
   def fromOption[A](opt: Option[A]): FreePointed[A] =
-    new Capture[PointedE[A, ?]] {
+    new Capture[PointedE[A, *]] {
       def continue[B](k: PointedE[A, B]): B = opt.fold(k.empty)(k.apply)
     }
 
   def fromNel[A](nel: NonEmptyList[A]): FreeSemigroup[A] =
-    new Capture[SemigroupE[A, ?]] {
+    new Capture[SemigroupE[A, *]] {
       def continue[B](k: SemigroupE[A, B]): B = nel.reduceMap(k.apply)(k)
     }
 
   def fromList[A](l: List[A]): FreeMonoid[A] =
-    new Capture[MonoidE[A, ?]] {
+    new Capture[MonoidE[A, *]] {
       def continue[B](k: MonoidE[A, B]): B = l.foldMap(k.apply)(k)
     }
 

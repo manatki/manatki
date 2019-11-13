@@ -45,19 +45,19 @@ object CountWords extends IOApp {
 
   val start = Space(Map())
 
-  def countWordsM[F[_]: Monad: MonadState[?[_], St]](str: String): F[Unit] =
+  def countWordsM[F[_]: Monad: MonadState[*[_], St]](str: String): F[Unit] =
     MonoStr(str).traverse_(consume[F])
 
   def countWordsState(str: String): Map[String, Int] =
-    countWordsM[State[St, ?]](str).runS(start).value.words
+    countWordsM[State[St, *]](str).runS(start).value.words
 
   def countWordsContT(str: String): Map[String, Int] =
-    countWordsM[ContT[ReaderT[Eval, St, ?], Map[String, Int], ?]](str)
+    countWordsM[ContT[ReaderT[Eval, St, *], Map[String, Int], *]](str)
       .run(_ => ReaderT(st => now(st.words)))
       .run(start)
       .value
   def countWordsCont(str: String): Map[String, Int] =
-    countWordsM[Cont.State[Map[String, Int], St, ?]](str)
+    countWordsM[Cont.State[Map[String, Int], St, *]](str)
       .run(_ => now(st => now(st.words)))
       .value(start)
       .value
@@ -67,6 +67,7 @@ object CountWords extends IOApp {
 
   def run(args: List[String]): IO[ExitCode] =
     IO(println(countWordsState(getString))) *>
-      IO(println(countWordsCont(getString))) as
+      IO(println(countWordsCont(getString))) *>
+      IO(println(countWordsContT(getString))) as
       ExitCode.Success
 }

@@ -20,7 +20,7 @@ sealed trait FreeMonoidal[F[_], A] {
 
 object FreeMonoidal {
   type FM[F[_], A]  = FreeMonoidal[F, A]
-  type DFM[F[_], A] = Day[F, FM[F, ?], A]
+  type DFM[F[_], A] = Day[F, FM[F, *], A]
   def pure[F[_], A](a: A): FreeMonoidal[F, A] = Pure[F, A](a)
 
   def lift[F[_], A](fa: F[A]): FreeMonoidal[F, A] =
@@ -29,7 +29,7 @@ object FreeMonoidal {
   private def liftDay[F[_], A](fa: F[A]): DFM[F, A] =
     Day(fa, pure[F, Unit](()))((a, _) => Eval.now(a))
 
-  private[FreeMonoidal] case class Trans[F[_], G[_]](f: F ~> G) extends FunctionK[FM[F, ?], FM[G, ?]] {
+  private[FreeMonoidal] case class Trans[F[_], G[_]](f: F ~> G) extends FunctionK[FM[F, *], FM[G, *]] {
     override def apply[A](fa: FM[F, A]): FM[G, A] = fa match {
       case Pure(a)   => Pure(a)
       case Cons(day) => Cons(Day(f(day.fx), apply(day.gy))(day.comb))
@@ -39,15 +39,15 @@ object FreeMonoidal {
   final case class Pure[F[_], A](a: A) extends FreeMonoidal[F, A]{
     override def foldEval(implicit F: Applicative[F]): Eval[F[A]] = Eval.now(F.pure(a))
 }
-  final case class Cons[F[_], A](day: Day[F, FreeMonoidal[F, ?], A]) extends FreeMonoidal[F, A]{
+  final case class Cons[F[_], A](day: Day[F, FreeMonoidal[F, *], A]) extends FreeMonoidal[F, A]{
     override def foldEval(implicit F: Applicative[F]): Eval[F[A]] =
       F.map2Eval(day.fx, day.gy.foldEval)(day.comb).map(_.map(_.value))
 }
 
-  implicit def instance[F[_]]: Applicative[FreeMonoidal[F, ?]] =
+  implicit def instance[F[_]]: Applicative[FreeMonoidal[F, *]] =
     new FreeMonoidalApplicative
 
-  class FreeMonoidalApplicative[F[_]] extends Applicative[FreeMonoidal[F, ?]] {
+  class FreeMonoidalApplicative[F[_]] extends Applicative[FreeMonoidal[F, *]] {
 
     override def map[A, B](fa: FM[F, A])(f: A => B): FM[F, B] = fa.map(f)
 

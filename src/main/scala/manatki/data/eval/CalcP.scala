@@ -68,7 +68,7 @@ object CalcP {
   implicit def calcInstance[R, S, E]: CalcFunctorInstance[R, S, E] = new CalcFunctorInstance[R, S, E]
 
   class CalcFunctorInstance[R, S, E]
-      extends MonadError[CalcP[R, S, E, ?], E] with cats.Defer[CalcP[R, S, E, ?]] with StackSafeMonad[CalcP[R, S, E, ?]] {
+      extends MonadError[CalcP[R, S, E, *], E] with cats.Defer[CalcP[R, S, E, *]] with StackSafeMonad[CalcP[R, S, E, *]] {
     def defer[A](fa: => CalcP[R, S, E, A]): CalcP[R, S, E, A]                                  = CalcP.defer(fa)
     def raiseError[A](e: E): CalcP[R, S, E, A]                                                = CalcP.raise(e)
     def handleErrorWith[A](fa: CalcP[R, S, E, A])(f: E => CalcP[R, S, E, A]): CalcP[R, S, E, A] = fa.handleWith(f)

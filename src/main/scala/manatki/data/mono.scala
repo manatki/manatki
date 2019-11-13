@@ -17,12 +17,12 @@ object MonoStr {
 
   implicit val monoStrFoldable: Foldable[MonoStr] = new Foldable[MonoStr] {
     def foldLeft[A, B](fa: MonoStr[A], b: B)(f: (B, A) => B): B = {
-      val fs = fa.is.substitute[(B, ?) => B](f)
+      val fs = fa.is.substitute[(B, *) => B](f)
       fa.str.foldLeft(b)(fs)
     }
 
     def foldRight[A, B](fa: MonoStr[A], lb: Eval[B])(f: (A, Eval[B]) => Eval[B]): Eval[B] = {
-      val fs = fa.is.substitute[(?, Eval[B]) => Eval[B]](f)
+      val fs = fa.is.substitute[(*, Eval[B]) => Eval[B]](f)
       def go(i: Int): Eval[B] =
         if (i == fa.str.length) lb
         else Eval.defer(fs(fa.str(i), go(i + 1)))

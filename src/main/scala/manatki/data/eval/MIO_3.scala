@@ -170,7 +170,7 @@ object MIO_3 {
   implicit def calcInstance[R, S, E]: MIOAsyncInstance[R, S, E] = new MIOAsyncInstance[R, S, E]
 
   class MIOAsyncInstance[R, S, E]
-      extends cats.Defer[MIO_3[R, S, S, E, ?]] with StackSafeMonad[MIO_3[R, S, S, E, ?]] with Async[MIO_3[R, S, S, E, ?]] {
+      extends cats.Defer[MIO_3[R, S, S, E, *]] with StackSafeMonad[MIO_3[R, S, S, E, *]] with Async[MIO_3[R, S, S, E, *]] {
     def suspend[A](fa: => MIO_3[R, S, S, E, A]): MIO_3[R, S, S, E, A]                             = MIO_3.defer(fa)
     def flatMap[A, B](fa: MIO_3[R, S, S, E, A])(f: A => MIO_3[R, S, S, E, B]): MIO_3[R, S, S, E, B] = fa.flatMap(f)
     def pure[A](x: A): MIO_3[R, S, S, E, A]                                                     = MIO_3.pure(x)

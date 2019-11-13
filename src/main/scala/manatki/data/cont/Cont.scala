@@ -34,7 +34,7 @@ object Cont {
   def callCC[R, A, B](c: CallCC[R, A, B]): Cont[R, A] = c
 
   /** Reader / State like operation */
-  def get[S, R]: State[R, S, S] = Cont(k => e => k(e)(e))
+  def get[S, R]: State[R, S, S] = Cont(k => s => k(s)(s))
 
   /** state constructor */
   def state[S, R, B](r: S => (B, S)): State[R, S, B] =
@@ -67,11 +67,11 @@ object Cont {
       c.flatMap(x => guardC[R](f(x)) as x)
   }
 
-  implicit def monadStateInstance[R, S]: MonadState[State[R, S, ?], S] = new ContStateMonad
+  implicit def monadStateInstance[R, S]: MonadState[State[R, S, *], S] = new ContStateMonad
 
-  implicit def monadInstance[R]: Monad[Cont[R, ?]] = new ContMonad[R]
+  implicit def monadInstance[R]: Monad[Cont[R, *]] = new ContMonad[R]
 
-  class ContMonad[R] extends StackSafeMonad[Cont[R, ?]] {
+  class ContMonad[R] extends StackSafeMonad[Cont[R, *]] {
     override def flatMap[A, B](fa: Cont[R, A])(f: A => Cont[R, B]): Cont[R, B] =
       k => now(fa).flatMap(_.run(_.flatMap(a => f(a).run(k))))
     override def pure[A](x: A): Cont[R, A] = f => f(now(x))
@@ -97,8 +97,8 @@ object Cont {
     def runStrict(k: A => R): R = resetS(shiftS(k))
   }
 
-  class ContStateMonad[S, R] extends ContMonad[S => Eval[R]] with MonadState[State[R, S, ?], S] {
-    val monad: Monad[State[R, S, ?]]          = this
+  class ContStateMonad[S, R] extends ContMonad[S => Eval[R]] with MonadState[State[R, S, *], S] {
+    val monad: Monad[State[R, S, *]]          = this
     def get: State[R, S, S]                   = Cont.get
     def set(s: S): State[R, S, Unit]          = Cont.put(s)
     def inspect[A](f: S => A): State[R, S, A] = Cont.get[S, R].map(f)

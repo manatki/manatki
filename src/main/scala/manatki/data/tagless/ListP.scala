@@ -13,7 +13,7 @@ object ListP {
   def range[B](from: Long, to: Long)(implicit lp: ListP[Long, B, B]): B =
     if (from >= to) nil else cons(from, range[B](from + 1, to))
 
-  implicit def layered[I]: Layered[ListP[I, ?, ?]] = new Layered[ListP[I, ?, ?]] {
+  implicit def layered[I]: Layered[ListP[I, *, *]] = new Layered[ListP[I, *, *]] {
     def tagless[A, C](f: L[A] => C): ListP[I, A, C] =
       new ListP[I, A, C] {
         def nil: C =

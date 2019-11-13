@@ -4,7 +4,7 @@ import cats.Eval.{later, now}
 import cats.{Eval, Foldable, Monoid}
 import cats.instances.function._
 import cats.instances.list._
-import cats.instances.stream._
+import cats.instances.lazyList._
 import cats.instances.int._
 import cats.syntax.traverse._
 import cats.syntax.flatMap._
@@ -52,7 +52,7 @@ class ContSuite extends FlatSpec with TimeLimitedTests {
     assert(
       List
         .range(1L, 10001L)
-        .traverse[Cont.State[List[Long], Long, ?], Long](x => Cont.state(i => (i + x, i + x)))
+        .traverse[Cont.State[List[Long], Long, *], Long](x => Cont.state(i => (i + x, i + x)))
         .runS(l => i => now(l))(0L)
         .value
         .sum === sumsSum)

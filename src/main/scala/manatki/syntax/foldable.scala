@@ -17,7 +17,7 @@ object foldable {
 
     /**collect first item returning Some(_) by monadic action, stack safe*/
     def collectFirstSM[B, M[_]](f: A => M[Option[B]])(implicit M: Monad[M], F: Foldable[F]): M[Option[B]] =
-      xs.foldRight(Now(OptionT.none[Free[M, ?], B]))(
+      xs.foldRight(Now(OptionT.none[Free[M, *], B]))(
         (x, opt) => Later(OptionT(Free.liftF(f(x))).orElse(opt.value))
       ).value.value.runTailRec
   }

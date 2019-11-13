@@ -66,8 +66,8 @@ object WireT {
     def apply[S, A](s: S, a: A)(implicit F: Applicative[F]): F[Socket[S, A]] = F.pure(Full(s, a))
   }
 
-  implicit def wireMonad[F[_], S](implicit F: Monad[F]): MonadError[WireT[F, S, ?], S] with MonadState[WireT[F, S, ?], S] =
-    new MonadError[WireT[F, S, ?], S] with MonadState[WireT[F, S, ?], S] {
+  implicit def wireMonad[F[_], S](implicit F: Monad[F]): MonadError[WireT[F, S, *], S] with MonadState[WireT[F, S, *], S] =
+    new MonadError[WireT[F, S, *], S] with MonadState[WireT[F, S, *], S] {
       def pure[A](x: A): WireT[F, S, A] = WireT[F](s => pureLoad[F](s, x))
       def flatMap[A, B](fa: WireT[F, S, A])(f: A => WireT[F, S, B]): WireT[F, S, B] =
         WireT(AndThen(fa.run).andThen(_.flatMap {

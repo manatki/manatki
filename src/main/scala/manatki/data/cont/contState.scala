@@ -9,12 +9,12 @@ import cats.{Defer, Monad, MonadError, StackSafeMonad}
 object contState {
   implicit def conttStateError[F[_]: Monad, R, X](
       implicit loc: ApplicativeLocal[F, R],
-      FD: Defer[F]): MonadState[ContT[F, X, ?], R] with MonadError[ContT[F, X, ?], X] =
-    new MonadState[ContT[F, X, ?], R] with MonadError[ContT[F, X, ?], X] {
+      FD: Defer[F]): MonadState[ContT[F, X, *], R] with MonadError[ContT[F, X, *], X] =
+    new MonadState[ContT[F, X, *], R] with MonadError[ContT[F, X, *], X] {
 //      implicit val contMonad: Monad[ContT[F, X, ?]] = ContT.catsDataContTMonad[F, X]
       import FD.defer
 
-      val monad: Monad[ContT[F, X, ?]] = this
+      val monad: Monad[ContT[F, X, *]] = this
 
       def get: ContT[F, X, R] = ContT(k => defer(loc.ask.flatMap(k)))
 
@@ -37,11 +37,11 @@ object contState {
     }
 
   implicit def contXTStateError[F[_]: Monad, R, X](
-      implicit loc: ApplicativeLocal[F, R]): MonadState[ContXT[F, X, ?], R] with MonadError[ContXT[F, X, ?], X] =
-    new MonadState[ContXT[F, X, ?], R] with MonadError[ContXT[F, X, ?], X] with StackSafeMonad[ContXT[F, X, ?]] {
+      implicit loc: ApplicativeLocal[F, R]): MonadState[ContXT[F, X, *], R] with MonadError[ContXT[F, X, *], X] =
+    new MonadState[ContXT[F, X, *], R] with MonadError[ContXT[F, X, *], X] with StackSafeMonad[ContXT[F, X, *]] {
       //      implicit val contMonad: Monad[ContT[F, X, ?]] = ContT.catsDataContTMonad[F, X]
 
-      val monad: Monad[ContXT[F, X, ?]] = this
+      val monad: Monad[ContXT[F, X, *]] = this
 
       def get: ContXT[F, X, R] = k => loc.ask.flatMap(k)
 

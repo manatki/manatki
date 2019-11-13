@@ -14,7 +14,7 @@ import cats.{Applicative, Eval, FlatMap, Functor}
   * something like Degoes Pipe
   * https://www.youtube.com/watch?v=wEVfJSi2J5o
 */
-final case class Reactive[F[_], A, B](cell: Cofree[Kleisli[F, A, ?], B]) {
+final case class Reactive[F[_], A, B](cell: Cofree[Kleisli[F, A, *], B]) {
   def current: B = cell.head
   def update(parent: A)(implicit F: Functor[F]): F[Reactive[F, A, B]] =
     cell.tail.map(_.run(parent).map(Reactive(_))).value
@@ -64,7 +64,7 @@ object Reactive {
   def stateless[F[_] : Functor, A, B](current: B, update: A => F[B]): Reactive[F, A, B] =
     apply(current, a => update(a).map(b => stateless(b, update)))
 
-  implicit def functorInstance[F[_] : Applicative, A]: Applicative[Reactive[F, A, ?]] = new Applicative[Reactive[F, A, ?]] {
+  implicit def functorInstance[F[_] : Applicative, A]: Applicative[Reactive[F, A, *]] = new Applicative[Reactive[F, A, *]] {
     override def pure[B](x: B): Reactive[F, A, B] = {
       lazy val inst: Reactive[F, A, B] = Reactive(x, _ => inst.pure[F])
       inst
@@ -78,11 +78,11 @@ object Reactive {
       Reactive[F, A, D](f(fa.current, fb.current), (a: A) => fa.update(a).map2(fb.update(a))(map2(_, _)(f)))
   }
 
-  implicit def profunctorInstance[F[_] : Functor]: Profunctor[Reactive[F, ?, ?]] = new Profunctor[Reactive[F, ?, ?]] {
+  implicit def profunctorInstance[F[_] : Functor]: Profunctor[Reactive[F, *, *]] = new Profunctor[Reactive[F, *, *]] {
     override def dimap[A, B, C, D](fab: Reactive[F, A, B])(f: C => A)(g: B => D): Reactive[F, C, D] = fab.contramap(f).map(g)
   }
 
-  implicit def composeInstance[F[_] : FlatMap]: Compose[Reactive[F, ?, ?]] = new Compose[Reactive[F, ?, ?]] {
+  implicit def composeInstance[F[_] : FlatMap]: Compose[Reactive[F, *, *]] = new Compose[Reactive[F, *, *]] {
     override def compose[A, B, C](f: Reactive[F, B, C], g: Reactive[F, A, B]): Reactive[F, A, C] = g.andThen(f)
   }
 }

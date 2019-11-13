@@ -15,8 +15,8 @@ object Layer {
       def cont[B](pa: P[Fix[P], B]): B = l.cont(pa)
     }
 
-  def functor[P[_, _]: Profunctor]: Functor[Layer[P, ?]] =
-    new Functor[Layer[P, ?]] {
+  def functor[P[_, _]: Profunctor]: Functor[Layer[P, *]] =
+    new Functor[Layer[P, *]] {
       def map[A, C](fa: Layer[P, A])(f: A => C): Layer[P, C] =
         new Layer[P, C] {
           def cont[B](pa: P[C, B]): B = fa.cont(pa.lmap(f))
@@ -25,7 +25,7 @@ object Layer {
 
   implicit def construct[P[_, _]](implicit P: Layered[P]): P[Layer.Fix[P], Layer.Fix[P]] = P.construct
 
-  implicit def functorInstance[P[_, _]: Profunctor]: Functor[Layer[P, ?]] = functor(Profunctor[P])
+  implicit def functorInstance[P[_, _]: Profunctor]: Functor[Layer[P, *]] = functor(Profunctor[P])
 }
 
 trait Coalgebra[P[_, _], A] {

@@ -14,7 +14,7 @@ class TZipperSuite extends FlatSpec {
   //  val replacements = List(None, None, Some(-2), None, Some(-4))
 
   def replaceWith[F[_] : Traverse, A](source: F[A], replacements: List[Option[A]]): (List[A], F[A]) =
-    replacements.foldLeftM[Writer[List[A], ?], TZipper[F, A]](TZipper(source)) {
+    replacements.foldLeftM[Writer[List[A], *], TZipper[F, A]](TZipper(source)) {
       case (TZipper.Done(res), _) => Writer.value(TZipper.Done(res))
       case (TZipper.Cursor(cur, f), repl) => Writer(List(cur), f(repl))
     }.map(_.zipUp).run

@@ -15,13 +15,13 @@ trait Distributed[F[_], G[_]] {
 }
 
 object Distributed extends Distributed1 {
-  implicit def distributedTuple[W, F[_]: Functor]: Distributed[(W, ?), F] = new Distributed[(W, ?), F] {
+  implicit def distributedTuple[W, F[_]: Functor]: Distributed[(W, *), F] = new Distributed[(W, *), F] {
     def exchange[A](fga: (W, F[A])): F[(W, A)] = fga._2.map((fga._1, _))
   }
-  implicit def distributedFunction[R, F[_]: Functor]: Distributed[F, R => ?] = new Distributed[F, R => ?] {
+  implicit def distributedFunction[R, F[_]: Functor]: Distributed[F, R => *] = new Distributed[F, R => *] {
     def exchange[A](gfa: F[R => A]): R => F[A] = r => gfa.map(_(r))
   }
-  implicit def distributedEither[E, F[_]: Applicative]: Distributed[Either[E, ?], F] = new Distributed[Either[E, ?], F] {
+  implicit def distributedEither[E, F[_]: Applicative]: Distributed[Either[E, *], F] = new Distributed[Either[E, *], F] {
     def exchange[A](fga: Either[E, F[A]]): F[Either[E, A]] = fga.fold(_.asLeft.pure, _.map(_.asRight))
   }
   implicit def distributedTry[F[_]: Applicative]: Distributed[Try, F] = new Distributed[Try, F] {

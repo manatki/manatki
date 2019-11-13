@@ -29,7 +29,7 @@ object ParKleisli {
       Single(a => prev.fab(a).flatMap(fab))
 
     protected def composeSplit[X1, Y1, X2, Y2](split: Split[F, X1, Y1, X2, Y2], yisa: Is[(Y1, Y2), A])(
-        implicit F: Monad[F]): ParKleisli[F, (X1, X2), B] = AndThen(yisa.substitute[ParKleisli[F, (X1, X2), ?]](split), this)
+        implicit F: Monad[F]): ParKleisli[F, (X1, X2), B] = AndThen(yisa.substitute[ParKleisli[F, (X1, X2), *]](split), this)
 
   }
   final case class Split[F[_], A, B, C, D](first: ParKleisli[F, A, B], second: ParKleisli[F, C, D])

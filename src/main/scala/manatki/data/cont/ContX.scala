@@ -52,7 +52,7 @@ object ContX {
   def guardC[X: Monoid](cond: Boolean): ContX[X, Unit] =
     f => if (cond) f(()) else Monoid.empty[X]
 
-  implicit def instance[X]: Monad[ContX[X, ?]] = new StackSafeMonad[ContX[X, ?]] {
+  implicit def instance[X]: Monad[ContX[X, *]] = new StackSafeMonad[ContX[X, *]] {
     override def flatMap[A, B](fa: ContX[X, A])(f: A => ContX[X, B]): ContX[X, B] =
       k => fa.run(AndThen(f).andThen(_.run(k)))
     override def pure[A](x: A): ContX[X, A] = _(x)

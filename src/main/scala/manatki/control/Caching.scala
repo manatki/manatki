@@ -54,20 +54,20 @@ object ReadFooService {
       }
 
   class ReadFooServicePut[F[_]](getFooRef: Ref[F, Map[String, Long]], getBarRef: Ref[F, Map[(Long, String), String]])
-      extends ReadFooService[Put[F, ?]] {
+      extends ReadFooService[Put[F, *]] {
     def getFoo(name: String): Long => F[Unit]                = res => getFooRef.update(_ + ((name, res)))
     def getBar(id: Long, fooName: String): String => F[Unit] = res => getBarRef.update(_ + (((id, fooName), res)))
   }
 
   class ReadFooServiceDelete[F[_]](getFooRef: Ref[F, Map[String, Long]], getBarRef: Ref[F, Map[(Long, String), String]])
-      extends ReadFooService[Delete[F, ?]] {
+      extends ReadFooService[Delete[F, *]] {
     def getFoo(name: String): F[Unit]              = getFooRef.update(_ - name)
     def getBar(id: Long, fooName: String): F[Unit] = getBarRef.update(_ - ((id, fooName)))
   }
 
   class ReadFooServiceGet[F[_]: Functor](getFooRef: Ref[F, Map[String, Long]],
                                          getBarRef: Ref[F, Map[(Long, String), String]])
-      extends ReadFooService[Get[F, ?]] {
+      extends ReadFooService[Get[F, *]] {
     def getFoo(name: String): F[Option[Long]]                = getFooRef.get.map(_.get(name))
     def getBar(id: Long, fooName: String): F[Option[String]] = getBarRef.get.map(_.get((id, fooName)))
   }

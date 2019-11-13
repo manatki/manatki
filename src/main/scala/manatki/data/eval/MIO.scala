@@ -312,8 +312,8 @@ object MIO {
   implicit def mioConcurrentInstance[R, S, E]: MIOConcurrentInstance[R, S, E]    = new MIOConcurrentInstance[R, S, E] {}
 
   class MIOAsyncInstance[R, S, C, E]
-      extends cats.Defer[MIO[R, S, S, C, E, ?]] with StackSafeMonad[MIO[R, S, S, C, E, ?]]
-      with Async[MIO[R, S, S, C, E, ?]] {
+      extends cats.Defer[MIO[R, S, S, C, E, *]] with StackSafeMonad[MIO[R, S, S, C, E, *]]
+      with Async[MIO[R, S, S, C, E, *]] {
     def suspend[A](fa: => MIO[R, S, S, C, E, A]): MIO[R, S, S, C, E, A]                                = MIO.defer(fa)
     def flatMap[A, B](fa: MIO[R, S, S, C, E, A])(f: A => MIO[R, S, S, C, E, B]): MIO[R, S, S, C, E, B] = fa.flatMap(f)
     def pure[A](x: A): MIO[R, S, S, C, E, A]                                                           = MIO.pure(x)
@@ -363,7 +363,7 @@ object MIO {
   }
 
   class MIOEffectInstance[C, E](implicit ec: EC)
-      extends MIOAsyncInstance[Any, Unit, C, E] with Effect[MIO[Any, Unit, Unit, C, E, ?]] {
+      extends MIOAsyncInstance[Any, Unit, C, E] with Effect[MIO[Any, Unit, Unit, C, E, *]] {
     def runAsync[A](mio: MIO[Any, Unit, Unit, C, E, A])(cb: Either[Throwable, A] => IO[Unit]): SyncIO[Unit] =
       SyncIO {
         val cbm = new Callback[Unit, C, E, A] {
@@ -378,7 +378,7 @@ object MIO {
 
   }
 
-  trait MIOConcurrentInstance[R, S, E] extends MIOAsyncInstance[R, S, Any, E] with Concurrent[MIO[R, S, S, Any, E, ?]] {
+  trait MIOConcurrentInstance[R, S, E] extends MIOAsyncInstance[R, S, Any, E] with Concurrent[MIO[R, S, S, Any, E, *]] {
     type F[A] = MIO[R, S, S, Any, E, A]
     private def fiberToEffect[A](fib: Fiber[S, Any, E, A]): effect.Fiber[F, A] = new effect.Fiber[F, A] {
       def cancel: F[Unit] = fib.cancel[S, Any](()).void
@@ -415,8 +415,8 @@ object MIO {
 
   class MIOConcurrentEffectInstance[E](implicit ec: EC)
       extends MIOEffectInstance[Any, E] with MIOConcurrentInstance[Any, Unit, E]
-      with ConcurrentEffect[MIO[Any, Unit, Unit, Any, E, ?]] {
-    def runCancelable[A](fa: MIO[Any, Unit, Unit, Any, E, A])(cb: Either[Throwable, A] => IO[Unit]): SyncIO[CancelToken[MIO[Any, Unit, Unit, Any, E, ?]]] = ???
+      with ConcurrentEffect[MIO[Any, Unit, Unit, Any, E, *]] {
+    def runCancelable[A](fa: MIO[Any, Unit, Unit, Any, E, A])(cb: Either[Throwable, A] => IO[Unit]): SyncIO[CancelToken[MIO[Any, Unit, Unit, Any, E, *]]] = ???
   }
 
   final case class MIOExcept[E](e: E) extends Throwable

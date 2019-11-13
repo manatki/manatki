@@ -17,7 +17,7 @@ class ParallelTest extends WordSpec with Matchers {
   type Res[a] = Either[Err, a]
 
   def addPair[F[_] : Parallel](x: F[Int], y: F[Int]): F[Int] = (x, y).parMapN(_ + _)
-  def verifyAllEvens[F[_] : Parallel : MonadError[?[_], Err]](xs: List[Int]): F[Unit] =
+  def verifyAllEvens[F[_] : Parallel : MonadError[*[_], Err]](xs: List[Int]): F[Unit] =
     xs.parTraverse_[F, Int](x => x.pure[F].ensure(NonEmptyList.of(x.toString))(_ % 2 == 0))
 
   "parallel either" when {
