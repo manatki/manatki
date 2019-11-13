@@ -1,7 +1,8 @@
-package manatki.data.eval.stage
-import cats.{Monad, StackSafeMonad}
+package manatki.data.cont
+
+import Conto.FlatMap
 import cats.mtl.MonadState
-import manatki.data.eval.stage.Conto.FlatMap
+import cats.{Monad, StackSafeMonad}
 
 sealed trait Conto[R, A] {
   def map[B](f: A => B): Conto[R, B]               = flatMap(a => Conto.Pure(f(a)))

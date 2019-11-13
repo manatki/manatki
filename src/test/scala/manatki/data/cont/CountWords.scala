@@ -13,7 +13,6 @@ import cats.syntax.functor._
 import cats.{Eval, Monad}
 import manatki.data.MonoStr
 import manatki.data.cont.contState._
-import manatki.data.eval.stage.Conto
 
 import scala.util.Random
 
