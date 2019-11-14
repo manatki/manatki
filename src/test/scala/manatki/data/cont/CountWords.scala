@@ -13,18 +13,20 @@ import cats.syntax.functor._
 import cats.{Eval, Monad}
 import manatki.data.MonoStr
 import manatki.data.cont.contState._
+import org.scalatest.{FlatSpec, Matchers}
 
+import scala.Function.const
 import scala.util.Random
 
-object CountWords extends IOApp {
+object CountWords {
   sealed trait St {
     def words: Map[String, Int]
   }
   final case class Space(words: Map[String, Int])                  extends St
   final case class Word(words: Map[String, Int], coll: List[Char]) extends St
 
-  def consume[F[_]: Monad](char: Char)(implicit F: MonadState[F, St]): F[Unit] =
-    F.get.flatMap {
+  def consume[F[_]](char: Char)(implicit F: MonadState[F, St]): F[Unit] =
+    F.monad.flatMap(F.get) {
       case Space(words) if char.isLetter      => F.set(Word(words, List(char)))
       case Space(_)                           => F.monad.unit
       case Word(words, coll) if char.isLetter => F.set(Word(words, char :: coll))
@@ -33,7 +35,7 @@ object CountWords extends IOApp {
         F.set(Space(words + (name -> (words.getOrElse(name, 0) + 1))))
     }
 
-  val getString = {
+  def getString() = {
     val parts = "lol kek yuu cheburek tii tot ryu".split(' ')
     Iterator
       .continually(parts(Random.nextInt(parts.length)))
@@ -68,8 +70,6 @@ object CountWords extends IOApp {
       .run(_ => st => Conto.Pure(st.words))(start)
       .evalue
 
-//  def countWordsContX(str: String): Map[String, Int] =
-//    countWordsM[ContXT[St => ?, Map[String, Int], ?]](str).run(_ => _.words)(start)
 
   def run(args: List[String]): IO[ExitCode] =
     IO(println(countWordsConto(getString))) *>
@@ -77,4 +77,18 @@ object CountWords extends IOApp {
       IO(println(countWordsCont(getString))) *>
 //      IO(println(countWordsContT(getString))) *> // SO
       IO(ExitCode.Success)
+}
+
+class CountWords extends FlatSpec with Matchers {
+  import CountWords._
+  val string = getString()
+
+  val correct = string.split("\\s+").groupMapReduce(identity)(const(1))(_ + _)
+
+  def check(f: String => Map[String, Int]) = f(string) should ===(correct)
+
+  "State monad" should "give correct result" in check(countWordsState)
+  "Eval based Cont monad" should "give correct result" in check(countWordsCont)
+  "Trampolined Cont monad" should "give correct result" in check(countWordsConto)
+  "cats Cont monad" should "give correct result in " in check(countWordsContT)
 }
