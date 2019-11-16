@@ -52,6 +52,9 @@ object Conto extends ContoInstances {
         }
     }
 
+  def callCC[R, A, B](f: (A => Conto[R, B]) => Conto[R, A]): Conto[R, A] =
+    shift(k => f(a => shift(_ => k(a))).flatMap(k))
+
   def contState[S, R, A](f: ((A, S) => Ev[R], S) => Ev[R]): State[R, S, A] =
     shift(k => Reset(Pure(s => f((a, s) => k(a).eflatMap(_(s)), s))))
 
