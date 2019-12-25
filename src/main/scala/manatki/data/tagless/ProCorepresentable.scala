@@ -39,8 +39,8 @@ trait ListP[I, A, B] {
 }
 
 object ListP {
-  implicit def corepresentable[I]: CorepresentablePro[ListP[I, *, *]] =
-    new CorepresentablePro[ListP[I, *, *]] {
+  implicit def corepresentable[I]: ProCorepresentable[ListP[I, *, *]] =
+    new ProCorepresentable[ListP[I, *, *]] {
       def tabulate[A, B](k: Rep[ListP[I, A, *]] => B): ListP[I, A, B] =
         new ListP[I, A, B] {
           def nil: B                    = k(Rep.mk(_.nil))
@@ -52,10 +52,22 @@ object ListP {
           def nil: B                    = fab.nil
           def cons(head: I, tail: C): B = fab.cons(head, f(tail))
         }
+
     }
 }
 
-trait CorepresentablePro[P[_, _]] extends Profunctor[P] {
+trait ProCorepresentable[P[_, _]] extends Profunctor[P] {
   def tabulate[A, B](k: Rep[P[A, *]] => B): P[A, B]
   def mapsnd[A, B, C](fab: P[A, B])(f: B => C): P[A, C] = tabulate(rep => f(rep.cont(fab)))
+
+//  def repFunctor: Functor[λ[B => Rep[λ[A => P[A, B]]]]] = new Functor[λ[B => Rep[λ[A => P[A, B]]]]] {
+//    def map[A, B](fa: Rep[P[*, B]])(f: A => B): Rep[P[*, B]] = ???
+//  }
+
+  def repFunctor: Functor[λ[A => Rep[P[A, *]]]] = new Functor[λ[A => Rep[P[A, *]]]] {
+    def map[A, B](fa: Rep[P[A, *]])(f: A => B): Rep[P[B, *]] =
+      fa.cont(mapfst(tabulate[B, Rep[P[B, *]]](identity))(f))
+  }
 }
+
+object ProCorepresentable {}
