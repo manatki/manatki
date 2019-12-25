@@ -19,8 +19,8 @@ trait ProCorepresentableK[P[i[_], o[_]]] extends ProfunctorK[P] {
   override def rightMapK[I[_], O[_], Q[_]](fab: P[I, O])(f: O ~> Q): P[I, Q] =
     tabulate(funK(rep => f(rep(fab))))
 
-  def repFunctorK[A]: FunctorK[λ[`i[_]` => RepK[P[i, *[_]], A]]] =
-    new FunctorK[λ[`i[_]` => RepK[P[i, *[_]], A]]] {
+  def repFunctorK[A]: FunctorK[λ[i[_] => RepK[P[i, *[_]], A]]] =
+    new FunctorK[λ[i[_] => RepK[P[i, *[_]], A]]] {
       def mapK[F[_], G[_]](af: RepK[P[F, *[_]], A])(fk : F ~> G): RepK[P[G, *[_]], A] =
         af(leftMapK(tabulate(FunctionK.id[RepK[P[G, *[_]], *]]))(fk))
     }
