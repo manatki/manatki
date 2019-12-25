@@ -60,10 +60,6 @@ trait ProCorepresentable[P[_, _]] extends Profunctor[P] {
   def tabulate[A, B](k: Rep[P[A, *]] => B): P[A, B]
   def mapsnd[A, B, C](fab: P[A, B])(f: B => C): P[A, C] = tabulate(rep => f(rep.cont(fab)))
 
-//  def repFunctor: Functor[λ[B => Rep[λ[A => P[A, B]]]]] = new Functor[λ[B => Rep[λ[A => P[A, B]]]]] {
-//    def map[A, B](fa: Rep[P[*, B]])(f: A => B): Rep[P[*, B]] = ???
-//  }
-
   def repFunctor: Functor[λ[A => Rep[P[A, *]]]] = new Functor[λ[A => Rep[P[A, *]]]] {
     def map[A, B](fa: Rep[P[A, *]])(f: A => B): Rep[P[B, *]] =
       fa.cont(mapfst(tabulate[B, Rep[P[B, *]]](identity))(f))
