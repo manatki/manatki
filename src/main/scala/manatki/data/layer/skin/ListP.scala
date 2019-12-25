@@ -1,5 +1,5 @@
-package manatki.data.tagless
-import cats.arrow.Profunctor
+package manatki.data.layer.skin
+
 
 trait ListP[I, -A, +B] {
   def nil: B
@@ -13,13 +13,13 @@ object ListP {
   def range[B](from: Long, to: Long)(implicit lp: ListP[Long, B, B]): B =
     if (from >= to) nil else cons(from, range[B](from + 1, to))
 
-  implicit def layered[I]: Layered[ListP[I, *, *]] = new Layered[ListP[I, *, *]] {
-    def tagless[A, C](f: L[A] => C): ListP[I, A, C] =
+  implicit def layered[I]: Skinny[ListP[I, *, *]] = new Skinny[ListP[I, *, *]] {
+    def tagless[A, C](f: S[A] => C): ListP[I, A, C] =
       new ListP[I, A, C] {
         def nil: C =
-          f(new L[A] { def cont[B](pa: ListP[I, A, B]): B = pa.nil })
+          f(new S[A] { def cont[B](pa: ListP[I, A, B]): B = pa.nil })
         def cons(head: I, tail: A): C =
-          f(new L[A] { def cont[B](pa: ListP[I, A, B]): B = pa.cons(head, tail) })
+          f(new S[A] { def cont[B](pa: ListP[I, A, B]): B = pa.cons(head, tail) })
       }
 
     def dimap[A, B, C, D](fab: ListP[I, A, B])(f: C => A)(g: B => D): ListP[I, C, D] =

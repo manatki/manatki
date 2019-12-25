@@ -1,31 +1,33 @@
-package manatki.data.tagless
+package manatki.data.layer.skin
+
 import cats.Functor
 import cats.arrow.Profunctor
 import cats.syntax.profunctor._
+import manatki.data.layer.skin
 
-trait Layer[P[_, _], A] {
+trait Skin[P[_, _], A] {
   def cont[B](pa: P[A, B]): B
 }
 
-object Layer {
-  trait Fix[P[_, _]] extends Layer[P, Fix[P]]
+object Skin {
+  trait Fix[P[_, _]] extends Skin[P, Fix[P]]
 
-  def fix[P[_, _]](l: Layer[P, Fix[P]]): Fix[P] =
+  def fix[P[_, _]](l: Skin[P, Fix[P]]): Fix[P] =
     new Fix[P] {
       def cont[B](pa: P[Fix[P], B]): B = l.cont(pa)
     }
 
-  def functor[P[_, _]: Profunctor]: Functor[Layer[P, *]] =
-    new Functor[Layer[P, *]] {
-      def map[A, C](fa: Layer[P, A])(f: A => C): Layer[P, C] =
-        new Layer[P, C] {
+  def functor[P[_, _]: Profunctor]: Functor[Skin[P, *]] =
+    new Functor[Skin[P, *]] {
+      def map[A, C](fa: Skin[P, A])(f: A => C): Skin[P, C] =
+        new Skin[P, C] {
           def cont[B](pa: P[C, B]): B = fa.cont(pa.lmap(f))
         }
     }
 
-  implicit def construct[P[_, _]](implicit P: Layered[P]): P[Layer.Fix[P], Layer.Fix[P]] = P.construct
+  implicit def construct[P[_, _]](implicit P: Skinny[P]): P[Skin.Fix[P], Skin.Fix[P]] = P.construct
 
-  implicit def functorInstance[P[_, _]: Profunctor]: Functor[Layer[P, *]] = functor(Profunctor[P])
+  implicit def functorInstance[P[_, _]: Profunctor]: Functor[Skin[P, *]] = functor(Profunctor[P])
 }
 
 trait Coalgebra[P[_, _], A] {
@@ -43,7 +45,7 @@ trait Corecursive[X] {
   type P[_, _]
   implicit def profunctor: Profunctor[P]
   def algebra: Algebra[P, X]
-  def ana[B](b: B, coalg: Coalgebra[P, B]): X = Hylo(algebra, coalg).apply(b)
+  def ana[B](b: B, coalg: Coalgebra[P, B]): X = skin.Hylo(algebra, coalg).apply(b)
 }
 
 trait Mu[P[_, _]] {
