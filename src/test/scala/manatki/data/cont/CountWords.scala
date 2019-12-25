@@ -13,7 +13,8 @@ import cats.syntax.functor._
 import cats.{Eval, Monad}
 import manatki.data.MonoStr
 import manatki.data.cont.contState._
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
 import scala.Function.const
 import scala.util.Random
@@ -79,7 +80,7 @@ object CountWords {
       IO(ExitCode.Success)
 }
 
-class CountWords extends FlatSpec with Matchers {
+class CountWords extends AnyFlatSpec with Matchers {
   import CountWords._
   val string = getString()
 

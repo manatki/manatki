@@ -2,12 +2,11 @@ package manatki.data.cont
 
 import cats.Traverse
 import cats.data.Writer
-import cats.effect.{IO, Sync}
-import org.scalatest.FlatSpec
 import cats.instances.list._
 import cats.syntax.foldable._
+import org.scalatest.flatspec.AnyFlatSpec
 
-class TZipperSuite extends FlatSpec {
+class TZipperSuite extends AnyFlatSpec {
 
 
   val list = List.range(0, 10)

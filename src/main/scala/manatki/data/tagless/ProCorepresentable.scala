@@ -1,9 +1,9 @@
 package manatki.data.tagless
+import cats.arrow.Profunctor
 import cats.{Contravariant, Functor}
-import scalaz.Profunctor
 
 trait Rep[F[_]] {
-  def cont[A](fa: F[A]): A
+  def apply[A](fa: F[A]): A
 }
 
 object Rep {
@@ -20,7 +20,7 @@ object Rep {
   abstract class MakeRepr[T[_], Arb] extends Rep[T] {
     def applyArbitrary(fk: T[Arb]): Arb
 
-    def cont[R](fk: T[R]): R = applyArbitrary(fk.asInstanceOf[T[Arb]]).asInstanceOf[R]
+    def apply[R](fk: T[R]): R = applyArbitrary(fk.asInstanceOf[T[Arb]]).asInstanceOf[R]
   }
 }
 
@@ -29,7 +29,7 @@ trait Representable[F[_]] {
 }
 
 object Representable {
-  def index[F[_], A](fa: F[A], r: Rep[F]): A = r.cont(fa)
+  def index[F[_], A](fa: F[A], r: Rep[F]): A = r.apply(fa)
 
 }
 
@@ -47,7 +47,7 @@ object ListP {
           def cons(head: I, tail: A): B = k(Rep.mk(_.cons(head, tail)))
         }
 
-      def mapfst[A, B, C](fab: ListP[I, A, B])(f: C => A): ListP[I, C, B] =
+      def leftMap[A, B, C](fab: ListP[I, A, B])(f: C => A): ListP[I, C, B] =
         new ListP[I, C, B] {
           def nil: B                    = fab.nil
           def cons(head: I, tail: C): B = fab.cons(head, f(tail))
@@ -56,14 +56,17 @@ object ListP {
     }
 }
 
-trait ProCorepresentable[P[_, _]] extends Profunctor[P] {
+trait ProCorepresentable[P[_, _]] extends Profunctor[P] with Functor[λ[A => Rep[P[A, *]]]] {
   def tabulate[A, B](k: Rep[P[A, *]] => B): P[A, B]
-  def mapsnd[A, B, C](fab: P[A, B])(f: B => C): P[A, C] = tabulate(rep => f(rep.cont(fab)))
 
-  def repFunctor: Functor[λ[A => Rep[P[A, *]]]] = new Functor[λ[A => Rep[P[A, *]]]] {
-    def map[A, B](fa: Rep[P[A, *]])(f: A => B): Rep[P[B, *]] =
-      fa.cont(mapfst(tabulate[B, Rep[P[B, *]]](identity))(f))
-  }
+  def leftMap[A, B, C](fab: P[A, B])(f: C => A): P[C, B]
+
+  override def lmap[A, B, C](fab: P[A, B])(f: C => A): P[C, B] = leftMap(fab)(f)
+  override def rmap[A, B, C](fab: P[A, B])(f: B => C): P[A, C] = tabulate(rep => f(rep(fab)))
+
+  def dimap[A, B, C, D](fab: P[A, B])(f: C => A)(g: B => D): P[C, D] = rmap(leftMap(fab)(f))(g)
+  override def map[A, B](fa: Rep[P[A, *]])(f: A => B): Rep[P[B, *]] =
+    fa(leftMap(tabulate(identity[Rep[P[B, *]]]))(f))
 }
 
 object ProCorepresentable {}
