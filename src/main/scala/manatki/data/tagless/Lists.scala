@@ -1,22 +1,24 @@
-package manatki.data.layer
+package manatki.data.tagless
 
-trait Single[-A, +O] {
-  def single(a: A): O
-}
 
-trait Empty[+O] {
-  def empty: O
-}
-
-trait Cons[-A, -I, +O] {
-  def cons(a: A, y: I): O
-}
-
-trait OptP[-A, +O]      extends Single[A, O] with Empty[O]
-trait NelP[-A, -I, +O]  extends Single[A, O] with Cons[A, I, O]
-trait ListP[-A, -I, +O] extends Cons[A, I, O] with Empty[O]
 
 object Lists {
+
+  trait Single[-A, +O] {
+    def single(a: A): O
+  }
+
+  trait Empty[+O] {
+    def empty: O
+  }
+
+  trait Cons[-A, -I, +O] {
+    def cons(a: A, y: I): O
+  }
+
+  trait OptP[-A, +O]      extends Single[A, O] with Empty[O]
+  trait NelP[-A, -I, +O]  extends Single[A, O] with Cons[A, I, O]
+  trait ListP[-A, -I, +O] extends Cons[A, I, O] with Empty[O]
 
 //  implicit def layered[E]: Layered[ListP[E, -?, +?]] =
 //    new Layered[ListP[E, -?, +?]] {

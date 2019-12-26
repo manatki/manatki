@@ -1,4 +1,4 @@
-package manatki.data.layer
+package manatki.data.tagless
 
 import cats.Eval
 import cats.arrow.Profunctor
