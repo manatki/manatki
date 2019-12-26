@@ -31,6 +31,8 @@ object Version {
 
   val zio = "1.0.0-RC17"
 
+  val zioMacros = "0.6.2"
+
   val kindProjector = "0.11.0"
 
   val bm4 = "0.3.0"

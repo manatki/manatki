@@ -33,29 +33,6 @@ object Representable {
 
 }
 
-trait ListP[I, A, B] {
-  def nil: B
-  def cons(head: I, tail: A): B
-}
-
-object ListP {
-  implicit def corepresentable[I]: ProCorepresentable[ListP[I, *, *]] =
-    new ProCorepresentable[ListP[I, *, *]] {
-      def tabulate[A, B](k: Rep[ListP[I, A, *]] => B): ListP[I, A, B] =
-        new ListP[I, A, B] {
-          def nil: B                    = k(Rep.mk(_.nil))
-          def cons(head: I, tail: A): B = k(Rep.mk(_.cons(head, tail)))
-        }
-
-      def leftMap[A, B, C](fab: ListP[I, A, B])(f: C => A): ListP[I, C, B] =
-        new ListP[I, C, B] {
-          def nil: B                    = fab.nil
-          def cons(head: I, tail: C): B = fab.cons(head, f(tail))
-        }
-
-    }
-}
-
 trait ProCorepresentable[P[_, _]] extends Profunctor[P] with Functor[λ[A => Rep[P[A, *]]]] {
   def tabulate[A, B](k: Rep[P[A, *]] => B): P[A, B]
 
@@ -70,9 +47,14 @@ trait ProCorepresentable[P[_, _]] extends Profunctor[P] with Functor[λ[A => Rep
 }
 
 object ProCorepresentable {
-  def tabulate[P[_, _], A, B](k: Rep[P[A, *]] => B)(implicit P: ProCorepresentable[P]): P[A, B] =
-    P.tabulate(k)
+  def tabulate[P[_, _], A, B](k: Rep[P[A, *]] => B)(implicit P: ProCorepresentable[P]): P[A, B] = P.tabulate(k)
 
   def construct[P[-_, +_]: ProCorepresentable]: P[Layer[P], Layer[P]] =
     tabulate[P, Layer[P], Layer[P]](_(construct))
+
+  def constant[P[-_, +_]: ProCorepresentable, A, B](b: B): P[A, B] = tabulate[P, A, B](_ => b)
+
+  class Tab[A, B, P[_, _]](val k: Rep[P[A, *]] => B)
+
+  class LMap[A, B, C, P[_, _]](val pab: P[A, B], val f: C => A)
 }

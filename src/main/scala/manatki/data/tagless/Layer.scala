@@ -1,8 +1,6 @@
 package manatki.data.tagless
 
-import cats.Eval
 import cats.arrow.Profunctor
-import manatki.control.Delay
 
 trait Layer[-P[-_, +_]] {
   def unpack[A](p: P[Layer[P], A]): A
@@ -11,32 +9,32 @@ trait Layer[-P[-_, +_]] {
 object Layer {
   type IdC[+A] = A
 
-  implicit class LayerOps[P[-_, +_]](val layer: Layer[P]) extends AnyVal {
-    def capture(implicit P: Profunctor[P]): Capture[P] = new Capture[P] {
-      def foldD[A](k: P[A, A])(implicit d: Delay[A]): A =
-        layer.unpack[A](P.lmap(k)((lp: Layer[P]) => d.delay(lp.capture.foldD(k))))
-    }
+  def apply[P[-_, +_]] = new Applied[P](true)
+  def mk[P[-_, +_]]    = new Applied[P](true)
+
+  class Applied[P[-_, +_]](private val __ : Boolean) extends AnyVal {
+    type Arb
+    def apply(maker: MakeLayer[P, Arb]): Layer[P] = maker
   }
-}
 
-trait Capture[-P[-_, +_]] {
-  def foldD[A: Delay](k: P[A, A]): A
+  abstract class MakeLayer[P[-_, +_], Arb] extends Layer[P] {
+    def applyArbitrary(fk: P[Layer[P], Arb]): Arb
 
-  def fold[A](k: P[A, A]): A                       = foldD[A](k)(Delay.force)
-  def foldLazy[A](k: P[Eval[A], Eval[A]]): Eval[A] = foldD(k)
+    def unpack[A](fk: P[Layer[P], A]): A = applyArbitrary(fk.asInstanceOf[P[Layer[P], Arb]]).asInstanceOf[A]
+  }
+
+  implicit class LayerOps[P[-_, +_]](val layer: Layer[P]) extends AnyVal {
+    def fold[A](p: P[A, A])(implicit P: Profunctor[P]): A = layer.unpack(P.lmap(p)(_.fold(p)))
+  }
+
+  def unfold[A, P[-_, +_]](builder: Builder[P, A])(init: A)(implicit P: Profunctor[P]): Layer[P] =
+    new Layer[P] {
+      def unpack[B](p: P[Layer[P], B]): B =
+        builder.continue(init, P.lmap(p)(unfold(builder)))
+    }
 }
 
 // aka coalgebra
-trait Builder[-P[-_, +_], A] {
+trait Builder[-P[_, _], A] {
   def continue[B](init: A, p: P[A, B]): B
-}
-
-trait Layered[P[-_, +_]] extends Profunctor[P] {
-  def layer: P[Layer[P], Layer[P]]
-  def capture: P[Capture[P], Capture[P]]
-}
-
-object Layered {
-  def build[P[-_, +_], A](init: A, b: Builder[P, A])(implicit l: Layered[P]): Layer[P] =
-    b.continue(init, l.lmap(l.layer)(build(_, b)))
 }

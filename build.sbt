@@ -24,11 +24,11 @@ libraryDependencies += "com.github.julien-truffaut" %% "monocle-macro"       % V
 libraryDependencies += "com.github.julien-truffaut" %% "monocle-state"       % Version.monocle
 libraryDependencies += "org.typelevel"              %% "simulacrum"          % Version.simulacrum
 
-
 //libraryDependencies += "ru.tinkoff"                 %% "tofu-optics-interop" % Version.tofu
 //libraryDependencies += "io.higherkindness"          %% "droste-core"         % Version.droste
 
-//libraryDependencies += "io.monix"                   %% "monix"               % Version.monix
+libraryDependencies += "dev.zio" %% "zio"             % Version.zio
+libraryDependencies += "dev.zio" %% "zio-macros-core" % Version.zioMacros
 scalacOptions in ThisBuild ++= List(
   "-Ymacro-annotations",
   "-deprecation",
