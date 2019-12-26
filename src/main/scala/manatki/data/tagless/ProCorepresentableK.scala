@@ -28,9 +28,9 @@ trait ProCorepresentableK[P[_[_], _[_]]] extends ProfunctorK[P] {
 }
 
 object ProCorepresentableK{
-  def tabulate[P[_[_], _[_]], F[_], G[_]](k: RepK[P[F, *[_]], *] ~> G)(implicit P: ProCorepresentableK[P]): P[F, G] =
+  def tabulateK[P[_[_], _[_]], F[_], G[_]](k: RepK[P[F, *[_]], *] ~> G)(implicit P: ProCorepresentableK[P]): P[F, G] =
     P.tabulate(k)
 
-  def construct[P[-_[_], +_[_]]: ProCorepresentableK]: P[Layer1[P, *], Layer1[P, *]] =
-    tabulate[P, Layer1[P, *], Layer1[P, *]](funK(_(construct)))
+  def constructK[P[-_[_], +_[_]]: ProCorepresentableK]: P[Layer1[P, *], Layer1[P, *]] =
+    tabulateK[P, Layer1[P, *], Layer1[P, *]](funK(_(constructK)))
 }
