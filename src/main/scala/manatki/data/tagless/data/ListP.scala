@@ -1,6 +1,9 @@
 package manatki.data.tagless.data
+import cats.Show
 import manatki.data.tagless.ProCorepresentable.{LMap, Tab}
 import manatki.data.tagless.{Layer, ProCorepresentable, Rep}
+import cats.syntax.show._
+import cats.instances.string._
 
 trait ListP[-A, -I, +O] extends Cons[A, I, O] with Nil[O]
 
@@ -23,4 +26,13 @@ object ListP {
 
   trait LeftMap[I, A, B, C, P[x, y] <: ListP[I, x, y]]
       extends LMap[A, B, C, P] with ListP[I, C, B] with Nil.LeftMap[A, B, C, P] with Cons.LeftMap[I, A, B, C, P]
+
+  implicit def showInstance[A: Show]: Show[XList[A]] =
+    "List(" + _.fold(new ListP[A, String, String] {
+      def nil: String = ")"
+      def cons(a: A, y: String): String = y match {
+        case ")" => show"$a)"
+        case _   => show"$a, $y"
+      }
+    })
 }

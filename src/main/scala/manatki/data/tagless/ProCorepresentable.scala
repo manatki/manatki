@@ -1,6 +1,7 @@
 package manatki.data.tagless
 import cats.arrow.Profunctor
-import cats.{Contravariant, Functor}
+import cats.{Applicative, Contravariant, Functor, Traverse}
+import manatki.data.tagless.Rep.Pro
 
 trait Rep[F[_]] {
   def apply[A](fa: F[A]): A
@@ -33,7 +34,7 @@ object Representable {
 
 }
 
-trait ProCorepresentable[P[_, _]] extends Profunctor[P] with Functor[λ[A => Rep[P[A, *]]]] {
+trait ProCorepresentable[P[_, _]] extends Profunctor[P] with Functor[Rep.Pro[P, *]] {
   def tabulate[A, B](k: Rep[P[A, *]] => B): P[A, B]
 
   def leftMap[A, B, C](fab: P[A, B])(f: C => A): P[C, B]
@@ -57,4 +58,15 @@ object ProCorepresentable {
   class Tab[A, B, P[_, _]](val k: Rep[P[A, *]] => B)
 
   class LMap[A, B, C, P[_, _]](val pab: P[A, B], val f: C => A)
+}
+
+trait ProTraverse[P[_, _]] extends ProCorepresentable[P] {
+  def protraverse[F[_]: Applicative, A, B](p: P[A, B]): P[F[A], F[B]]
+}
+
+object ProTraverse {
+  trait ByTraverse[P[_, _]] extends ProTraverse[P] with Traverse[Rep.Pro[P, *]] {
+    def protraverse[F[_], A, B](p: P[A, B])(implicit F: Applicative[F]): P[F[A], F[B]] =
+      tabulate(rep => F.map(sequence[F, A](rep))(_(p)))
+  }
 }
