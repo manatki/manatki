@@ -1,6 +1,8 @@
 package manatki.data.tagless
 package data
 import manatki.data.tagless.ProCorepresentable.{LMap, Tab}
+import manatki.data.tagless.ProTraverse.ProTrav
+import tofu.syntax.monadic._
 
 trait Single[-A, +O] {
   def single(a: A): O
@@ -24,4 +26,9 @@ object Single {
   trait LeftMap[I, A, B, C, P[x, y] <: Single[I, y]] extends LMap[A, B, C, P] with Single[I, B] {
     def single(a: I): B = pab.single(a)
   }
+
+  trait Trav[F[_], I, A, B, P[x, y] <: Single[I, y]] extends ProTrav[F, A, B, P] with Single[I, F[B]] {
+    def single(a: I): F[B] = pab.single(a).pure[F]
+  }
+
 }

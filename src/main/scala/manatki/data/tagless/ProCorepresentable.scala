@@ -69,4 +69,6 @@ object ProTraverse {
     def protraverse[F[_], A, B](p: P[A, B])(implicit F: Applicative[F]): P[F[A], F[B]] =
       tabulate(rep => F.map(sequence[F, A](rep))(_(p)))
   }
+
+  class ProTrav[F[_], A, B, P[_, _]](val pab: P[A, B])(implicit val F: Applicative[F])
 }
