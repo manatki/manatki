@@ -45,13 +45,15 @@ trait ProCorepresentable[P[_, _]] extends Profunctor[P] with Functor[Rep.Pro[P, 
   def dimap[A, B, C, D](fab: P[A, B])(f: C => A)(g: B => D): P[C, D] = rmap(leftMap(fab)(f))(g)
   override def map[A, B](fa: Rep[P[A, *]])(f: A => B): Rep[P[B, *]] =
     fa(leftMap(tabulate(identity[Rep[P[B, *]]]))(f))
+
+  def zip[A, B, C, D](pab: P[A, B], pcd: P[C, D]): P[(A, C), (B, D)] =
+    tabulate(rep => (rep(leftMap(pab)(_._1)), rep(leftMap(pcd)(_._2))))
 }
 
 object ProCorepresentable {
   def tabulate[P[_, _], A, B](k: Rep[P[A, *]] => B)(implicit P: ProCorepresentable[P]): P[A, B] = P.tabulate(k)
 
-  def construct[P[-_, +_]: ProCorepresentable]: P[Layer[P], Layer[P]] =
-    tabulate[P, Layer[P], Layer[P]](_(construct))
+  def construct[P[-_, +_]: ProCorepresentable]: P[Layer[P], Layer[P]] = tabulate[P, Layer[P], Layer[P]](_(construct))
 
   def constant[P[-_, +_]: ProCorepresentable, A, B](b: B): P[A, B] = tabulate[P, A, B](_ => b)
 

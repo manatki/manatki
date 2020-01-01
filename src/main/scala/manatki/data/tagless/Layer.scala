@@ -1,5 +1,6 @@
 package manatki.data.tagless
 
+import cats.Eval
 import cats.arrow.Profunctor
 
 trait Layer[-P[-_, +_]] {
@@ -25,6 +26,12 @@ object Layer {
 
   implicit class LayerOps[P[-_, +_]](val layer: Layer[P]) extends AnyVal {
     def fold[A](p: P[A, A])(implicit P: Profunctor[P]): A = layer.unpack(P.lmap(p)(_.fold(p)))
+
+    def foldEval[A](p: P[Eval[A], Eval[A]])(implicit P: ProTraverse[P]): Eval[A] =
+      layer.unpack(P.lmap(p)(x => Eval.defer(x.foldEval(p))))
+
+    def foldL[A](p: P[A, A])(implicit P: ProTraverse[P]): Eval[A] =
+      layer.foldEval(P.protraverse(p))
   }
 
   def unfold[A, P[-_, +_]](builder: Builder[P, A])(init: A)(implicit P: Profunctor[P]): Layer[P] =
