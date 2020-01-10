@@ -1,7 +1,7 @@
 package manatki.data.tagless.data
 import cats.{Applicative, Show}
 import manatki.data.tagless.ProCorepresentable.{LMap, Tab}
-import manatki.data.tagless.{Layer, ProCorepresentable, ProTraverse, Rep}
+import manatki.data.tagless.{Builder, Layer, ProCorepresentable, ProTraverse, Rep}
 import cats.syntax.show._
 import cats.instances.string._
 import manatki.data.tagless.ProTraverse.ProTrav
@@ -9,10 +9,15 @@ import manatki.data.tagless.ProTraverse.ProTrav
 trait ListP[-A, -I, +O] extends Cons[A, I, O] with Nil[O]
 
 object ListP {
-  def apply[A](as: A*): XList[A] = as match {
-    case Seq()     => Nil
-    case a +: rest => Cons(a, apply(rest: _*))
-  }
+  def apply[A](as: A*): XList[A] = fromSeq(as)
+
+  def fromSeq[A](as: Seq[A]): XList[A] =
+    Layer.unfold(as)(new Builder[ListP[A, -*, +*], Seq[A]] {
+      def continue[B](init: Seq[A], p: ListP[A, Seq[A], B]): B = init match {
+        case a +: as => p.cons(a, as)
+        case Seq()   => p.nil
+      }
+    })
 
   implicit def corepresentable[I]: ProTraverse[ListP[I, *, *]] = new ProTraverse[ListP[I, *, *]] {
     def tabulate[A, B](k: Rep[ListP[I, A, *]] => B): ListP[I, A, B] =

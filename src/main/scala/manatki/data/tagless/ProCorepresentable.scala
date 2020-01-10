@@ -1,7 +1,6 @@
 package manatki.data.tagless
 import cats.arrow.Profunctor
-import cats.{Applicative, Contravariant, Functor, Traverse}
-import manatki.data.tagless.Rep.Pro
+import cats.{Applicative, Functor, Traverse}
 
 trait Rep[F[_]] {
   def apply[A](fa: F[A]): A
@@ -55,7 +54,10 @@ object ProCorepresentable {
 
   def construct[P[-_, +_]: ProCorepresentable]: P[Layer[P], Layer[P]] = tabulate[P, Layer[P], Layer[P]](_(construct))
 
-  def constant[P[-_, +_]: ProCorepresentable, A, B](b: B): P[A, B] = tabulate[P, A, B](_ => b)
+  def constant[P[_, _]: ProCorepresentable, A, B](b: B): P[A, B] = tabulate[P, A, B](_ => b)
+
+  def zip[P[_, _], A, B, C, D](pab: P[A, B], pcd: P[C, D])(implicit P: ProCorepresentable[P]): P[(A, C), (B, D)] =
+    P.zip(pab, pcd)
 
   class Tab[A, B, P[_, _]](val k: Rep[P[A, *]] => B)
 
