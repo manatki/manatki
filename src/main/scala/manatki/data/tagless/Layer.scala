@@ -51,34 +51,55 @@ object Layer {
   ): Eval[A] =
     l.unpack(P.lmap(p)(la => Eval.defer(paraEvalT(la, p).tupleRight(la))))
 
-  def unfold[A, P[-_, +_]](init: A)(builder: Builder[P, A])(implicit P: Profunctor[P]): Layer[P] =
-    new Layer[P] {
-      def unpack[B](p: P[Layer[P], B]): B =
-        builder.continue(init, P.lmap(p)(unfold(_)(builder)))
-    }
-
-  def apo[A, P[-_, +_]](init: A)(builder: Builder[P, LayerOr[P, A]])(implicit P: Profunctor[P]): Layer[P] =
-    new Layer[P] {
-      def unpack[B](p: P[Layer[P], B]): B =
-        builder.continue(LayerVal(init), P.lmap(p) {
-          case l: Layer[P] => l
-          case LayerVal(a) => apo(a)(builder)
-        })
-    }
-
-  def hylo[A, B, P[_, _]](b: Builder[P, A])(p: P[B, B])(a: A)(implicit P: Profunctor[P]): B =
-    b.continue(a, P.lmap(p)(hylo(b)(p)))
-
-  def hyloEval[A, B, P[_, _]](
-      b: Builder[P, A]
-  )(p: P[Eval[B], Eval[B]])(a: A)(implicit P: Profunctor[P]): Eval[B] =
-    b.continue(a, P.lmap(p)(ea => Eval.defer(hyloEval(b)(p)(ea))))
-
-  def hyloL[A, B, P[_, _]](b: Builder[P, A])(p: P[B, B])(a: A)(implicit P: ProTraverse[P]): Eval[B] =
-    hyloEval(b)(P.protraverse(p))(a)
 }
 
 // aka coalgebra
 trait Builder[-P[_, _], A] {
   def continue[B](init: A, p: P[A, B]): B
+}
+
+object Builder {
+
+  def apply[P[_, _], A] = new Applied[P, A](true)
+
+  class Applied[P[_, _], A](private val __ : Boolean) extends AnyVal {
+    type Arb
+
+    def apply(builder: ArbBuilder[P, A, Arb]): Builder[P, A] = builder
+  }
+
+  abstract class ArbBuilder[P[_, _], A, W] extends Builder[P, A] {
+    def continueArb(init: A, p: P[A, W]): W
+
+    def continue[B](init: A, p: P[A, B]): B = continueArb(init, p.asInstanceOf[P[A, W]]).asInstanceOf[B]
+  }
+
+  implicit class BuilderOps[P[_, _], A](private val builder: Builder[P, A]) extends AnyVal {
+    def hylo[B](p: P[B, B])(a: A)(implicit P: Profunctor[P]): B = builder.continue(a, P.lmap(p)(hylo(p)))
+
+    def hyloEval[B](p: P[Eval[B], Eval[B]])(a: A)(implicit P: Profunctor[P]): Eval[B] =
+      builder.continue(a, P.lmap(p)(ea => Eval.defer(hyloEval(p)(ea))))
+
+    def hyloL[B](p: P[B, B])(a: A)(implicit P: ProTraverse[P]): Eval[B] = hyloEval(P.protraverse(p))(a)
+  }
+
+  implicit class BuilderUnfoldOps[P[-_, +_], A](private val builder: Builder[P, A]) extends AnyVal {
+    def unfold(init: A)(implicit P: Profunctor[P]): Layer[P] =
+      new Layer[P] {
+        def unpack[B](p: P[Layer[P], B]): B =
+          builder.continue(init, P.lmap(p)(unfold(_)))
+      }
+  }
+
+  implicit class BuilderApoOps[P[-_, +_], A](private val builder: Builder[P, LayerOr[P, A]]) extends AnyVal {
+    def apo(init: A)(implicit P: Profunctor[P]): Layer[P] =
+      new Layer[P] {
+        def unpack[B](p: P[Layer[P], B]): B =
+          builder.continue(LayerVal(init), P.lmap(p) {
+            case l: Layer[P] => l
+            case LayerVal(a) => apo(a)
+          })
+      }
+  }
+
 }

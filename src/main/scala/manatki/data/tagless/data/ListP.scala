@@ -12,12 +12,10 @@ object ListP {
   def apply[A](as: A*): XList[A] = fromSeq(as)
 
   def fromSeq[A](as: Seq[A]): XList[A] =
-    Layer.unfold(as)(new Builder[ListP[A, -*, +*], Seq[A]] {
-      def continue[B](init: Seq[A], p: ListP[A, Seq[A], B]): B = init match {
-        case a +: as => p.cons(a, as)
-        case Seq()   => p.nil
-      }
-    })
+    Builder[ListP[A, -*, +*], Seq[A]] {
+      case (a +: as, p) => p.cons(a, as)
+      case (Seq(), p)   => p.nil
+    }.unfold(as)
 
   implicit def corepresentable[I]: ProTraverse[ListP[I, *, *]] = new ProTraverse[ListP[I, *, *]] {
     def tabulate[A, B](k: Rep[ListP[I, A, *]] => B): ListP[I, A, B] =

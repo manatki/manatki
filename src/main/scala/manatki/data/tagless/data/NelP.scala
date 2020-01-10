@@ -2,15 +2,16 @@ package manatki.data.tagless.data
 import cats.Applicative
 import manatki.data.tagless.ProCorepresentable.{LMap, Tab}
 import manatki.data.tagless.ProTraverse.ProTrav
-import manatki.data.tagless.{Layer, ProCorepresentable, ProTraverse, Rep}
+import manatki.data.tagless.{Builder, Layer, ProCorepresentable, ProTraverse, Rep}
 
 trait NelP[-A, -I, +O] extends Single[A, O] with Cons[A, I, O]
 
 object NelP {
-  def apply[A](a: A, as: A*): XNel[A] = as match {
-    case Seq()      => Single(a)
-    case a1 +: rest => Cons(a, apply(a1, rest: _*))
-  }
+  def apply[A](a: A, as: A*): XNel[A] =
+    Builder[NelP[A, -*, +*], Seq[A]] {
+      case (Seq(a), p)          => p.single(a)
+      case (Seq(a, as @ _*), p) => p.cons(a, as)
+    }.unfold(a +: as)
 
   implicit def corepresentable[I]: ProTraverse[NelP[I, *, *]] = new ProTraverse[NelP[I, *, *]] {
     def tabulate[A, B](k: Rep[NelP[I, A, *]] => B): NelP[I, A, B] =
