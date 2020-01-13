@@ -2,6 +2,7 @@ package manatki.data.tagless
 
 import cats.{Comonad, Eval, Monad, StackSafeMonad}
 import cats.arrow.Profunctor
+import manatki.data.tagless.Rep.Pro
 import tofu.higherKind.Function2K
 import tofu.syntax.monadic._
 
@@ -194,5 +195,31 @@ object FreeP {
           fa.unpack(P.lmap(pf)(flatMap(_)(f)))(f(_).unpack(pf)(br))
       }
       def pure[A](x: A): FreeP[P, A] = FreeP.pure(x)
+    }
+}
+
+trait FreerP[-P[-_, +_], +A] {
+  def unpack[R](pf: FreerP.Bind[P, A, R])(ar: A => R): R
+}
+
+object FreerP {
+  trait Bind[+P[-_, +_], -B, R] {
+    def continue[A](pa: Rep.Pro[P, A])(k: A => FreerP[P, B]): R
+  }
+
+  def pure[A](x: A): FreerP[Any, A] = new FreerP[Any, A] {
+    def unpack[R](pf: Bind[Any, A, R])(ar: A => R): R = ar(x)
+  }
+
+  implicit def freerMonad[P[-_, +_]](implicit P: Profunctor[P]): Monad[FreerP[P, *]] =
+    new StackSafeMonad[FreerP[P, *]] {
+      def flatMap[A, B](fa: FreerP[P, A])(f: A => FreerP[P, B]): FreerP[P, B] =
+        fa.unpack(new Bind[P, A, FreerP[P, B]] {
+          def continue[C](pa: Pro[P, C])(k: C => FreerP[P, A]): FreerP[P, B] = new FreerP[P, B] {
+            def unpack[R](pf: Bind[P, B, R])(ar: B => R): R = pf.continue(pa)(c => k(c).flatMap(f))
+          }
+        })(a => f(a))
+
+      def pure[A](x: A): FreerP[P, A] = FreerP.pure(x)
     }
 }

@@ -20,7 +20,7 @@ object Single {
   }
 
   trait Tabulate[I, A, B, P[x, y] <: Single[I, y]] extends Tab[A, B, P] with Single[I, B] {
-    def single(a: I): B = k(Rep.mk(_.single(a)))
+    def single(a: I): B = k(Rep.pro[P, A](_.single(a)))
   }
 
   trait LeftMap[I, A, B, C, P[x, y] <: Single[I, y]] extends LMap[A, B, C, P] with Single[I, B] {

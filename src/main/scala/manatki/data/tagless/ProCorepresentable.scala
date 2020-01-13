@@ -2,15 +2,16 @@ package manatki.data.tagless
 import cats.arrow.Profunctor
 import cats.{Applicative, Functor, Traverse}
 
-trait Rep[F[_]] {
+trait Rep[-F[_]] {
   def apply[A](fa: F[A]): A
 }
 
 object Rep {
-  type Pro[P[a, b], A] = Rep[P[A, *]]
+  type Pro[-P[a, b], A]      = Rep[P[A, *]]
 
-  def apply[U[_]] = new Applied[U](true)
-  def mk[U[_]]    = new Applied[U](true)
+  def apply[U[_]]     = new Applied[U](true)
+  def mk[U[_]]        = new Applied[U](true)
+  def pro[P[_, _], A] = new Applied[P[A, *]](true)
 
   class Applied[T[_]](private val __ : Boolean) extends AnyVal {
     type Arb

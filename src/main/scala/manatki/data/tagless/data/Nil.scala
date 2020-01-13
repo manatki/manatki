@@ -15,7 +15,7 @@ object Nil extends Layer[λ[(`-a`, `+b`) => Nil[b]]] {
   type NP[-a, +b] = Nil[b]
 
   trait Tabulate[A, B, P[x, y] <: Nil[y]] extends Tab[A, B, P] with Nil[B] {
-    def nil: B = k(Rep.mk(_.nil))
+    def nil: B = k(Rep.pro[P, A](_.nil))
   }
 
   trait LeftMap[A, B, C, P[x, y] <: Nil[y]] extends LMap[A, B, C, P] with Nil[B] {

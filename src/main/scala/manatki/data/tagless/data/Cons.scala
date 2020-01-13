@@ -13,7 +13,7 @@ object Cons {
   def apply[A, P[-i, +o] <: Cons[A, i, o]](a: A, tail: Layer[P]): Layer[P] = Layer[P](_.cons(a, tail))
 
   trait Tabulate[I, A, B, P[x, y] <: Cons[I, x, y]] extends Tab[A, B, P] with Cons[I, A, B] {
-    def cons(head: I, tail: A): B = k(Rep.mk(_.cons(head, tail)))
+    def cons(head: I, tail: A): B = k(Rep.pro[P, A](_.cons(head, tail)))
   }
 
   trait LeftMap[I, A, B, C, P[x, y] <: Cons[I, x, y]] extends LMap[A, B, C, P] with Cons[I, C, B] {
