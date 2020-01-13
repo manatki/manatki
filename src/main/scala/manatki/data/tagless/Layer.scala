@@ -1,6 +1,6 @@
 package manatki.data.tagless
 
-import cats.Eval
+import cats.{Comonad, Eval, Monad, StackSafeMonad}
 import cats.arrow.Profunctor
 import tofu.higherKind.Function2K
 import tofu.syntax.monadic._
@@ -8,7 +8,7 @@ import tofu.syntax.monadic._
 sealed trait LayerOr[-P[-_, +_], +A]
 
 trait Layer[-P[-_, +_]] extends LayerOr[P, Nothing] {
-  def unpack[A](p: P[Layer[P], A]): A
+  def unpack[R](p: P[Layer[P], R]): R
 }
 
 final case class LayerVal[+A](a: A) extends LayerOr[Any, A]
@@ -27,7 +27,7 @@ object Layer {
   abstract class MakeLayer[P[-_, +_], Arb] extends Layer[P] {
     def applyArbitrary(fk: P[Layer[P], Arb]): Arb
 
-    def unpack[A](fk: P[Layer[P], A]): A = applyArbitrary(fk.asInstanceOf[P[Layer[P], Arb]]).asInstanceOf[A]
+    def unpack[R](fk: P[Layer[P], R]): R = applyArbitrary(fk.asInstanceOf[P[Layer[P], Arb]]).asInstanceOf[R]
   }
 
   implicit class LayerOps[P[-_, +_]](private val layer: Layer[P]) extends AnyVal {
@@ -69,7 +69,7 @@ object Layer {
 
 // aka coalgebra
 trait Builder[-P[_, _], A] {
-  def continue[B](init: A, p: P[A, B]): B
+  def continue[R](init: A, p: P[A, R]): R
 }
 
 object Builder {
@@ -103,6 +103,11 @@ object Builder {
         def unpack[B](p: P[Layer[P], B]): B =
           builder.continue(init, P.lmap(p)(unfold(_)))
       }
+
+    def postpro(f: FunK2[P, P])(init: A)(implicit P: Profunctor[P]): Layer[P] = new Layer[P] {
+      def unpack[B](p: P[Layer[P], B]): B =
+        builder.continue(init, f(P.lmap(p)(postpro(f)(_))))
+    }
   }
 
   implicit class BuilderApoOps[P[-_, +_], A](private val builder: Builder[P, LayerOr[P, A]]) extends AnyVal {
@@ -115,5 +120,79 @@ object Builder {
           })
       }
   }
+}
 
+trait CofreeP[-P[-_, +_], +A] {
+  def value: A
+  def unpack[R](p: P[CofreeP[P, A], R]): R
+}
+
+object CofreeP {
+  def apply[P[-_, +_]] = new Applied[P](true)
+  def mk[P[-_, +_]]    = new Applied[P](true)
+
+  class Applied[P[-_, +_]](private val __ : Boolean) extends AnyVal {
+    type Arb
+    def apply[A](a: A)(maker: MakeLayer[A, P, Arb]): CofreeP[P, A] = new CofreeP[P, A] {
+      def value: A                             = a
+      def unpack[R](p: P[CofreeP[P, A], R]): R = maker.unpack(p)
+    }
+  }
+
+  abstract class MakeLayer[A, P[-_, +_], Arb] {
+    def applyArbitrary(fk: P[CofreeP[P, A], Arb]): Arb
+
+    def unpack[R](fk: P[CofreeP[P, A], R]): R = applyArbitrary(fk.asInstanceOf[P[CofreeP[P, A], Arb]]).asInstanceOf[R]
+  }
+
+  implicit def cofreeInstance[P[-_, +_]](implicit P: Profunctor[P]): Comonad[CofreeP[P, *]] =
+    new Comonad[CofreeP[P, *]] {
+      def extract[A](x: CofreeP[P, A]): A = x.value
+      def coflatMap[A, B](fa: CofreeP[P, A])(f: CofreeP[P, A] => B): CofreeP[P, B] =
+        new CofreeP[P, B] {
+          def value: B = f(fa)
+          def unpack[R](p: P[CofreeP[P, B], R]): R =
+            fa.unpack(P.lmap(p)(coflatMap(_)(f)))
+        }
+      def map[A, B](fa: CofreeP[P, A])(f: A => B): CofreeP[P, B] =
+        new CofreeP[P, B] {
+          def value: B = f(fa.value)
+          def unpack[R](p: P[CofreeP[P, B], R]): R =
+            fa.unpack(P.lmap(p)(map(_)(f)))
+        }
+    }
+}
+
+trait FreeP[-P[-_, +_], +A] {
+  def unpack[R](pf: P[FreeP[P, A], R])(ar: A => R): R
+}
+
+object FreeP {
+  def apply[P[-_, +_], A] = new Applied[P, A](true)
+  def mk[P[-_, +_], A]    = new Applied[P, A](true)
+
+  def pure[A](a: A): FreeP[Any, A] = new FreeP[Any, A] {
+    def unpack[R](pf: Any)(ar: A => R): R = ar(a)
+  }
+
+  class Applied[P[-_, +_], A](private val __ : Boolean) extends AnyVal {
+    type Arb
+    def apply(maker: MakeLayer[P, A, Arb]): FreeP[P, A] = maker
+  }
+
+  abstract class MakeLayer[P[-_, +_], A, Arb] extends FreeP[P, A] {
+    def applyArbitrary(fk: P[FreeP[P, A], Arb]): Arb
+
+    def unpack[R](fk: P[FreeP[P, A], R])(ar: A => R): R =
+      applyArbitrary(fk.asInstanceOf[P[FreeP[P, A], Arb]]).asInstanceOf[R]
+  }
+
+  implicit def freeMonad[P[-_, +_]](implicit P: Profunctor[P]): Monad[FreeP[P, *]] =
+    new StackSafeMonad[FreeP[P, *]] {
+      def flatMap[A, B](fa: FreeP[P, A])(f: A => FreeP[P, B]): FreeP[P, B] = new FreeP[P, B] {
+        def unpack[R](pf: P[FreeP[P, B], R])(br: B => R): R =
+          fa.unpack(P.lmap(pf)(flatMap(_)(f)))(f(_).unpack(pf)(br))
+      }
+      def pure[A](x: A): FreeP[P, A] = FreeP.pure(x)
+    }
 }
