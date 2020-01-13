@@ -211,14 +211,14 @@ object FreerP {
     def unpack[R](pf: Bind[Any, A, R])(ar: A => R): R = ar(x)
   }
 
-  implicit def freerMonad[P[-_, +_]](implicit P: Profunctor[P]): Monad[FreerP[P, *]] =
+  implicit def freerMonad[P[-_, +_]]: Monad[FreerP[P, *]] =
     new StackSafeMonad[FreerP[P, *]] {
       def flatMap[A, B](fa: FreerP[P, A])(f: A => FreerP[P, B]): FreerP[P, B] =
         fa.unpack(new Bind[P, A, FreerP[P, B]] {
           def continue[C](pa: Pro[P, C])(k: C => FreerP[P, A]): FreerP[P, B] = new FreerP[P, B] {
-            def unpack[R](pf: Bind[P, B, R])(ar: B => R): R = pf.continue(pa)(c => k(c).flatMap(f))
+            def unpack[R](pf: Bind[P, B, R])(ar: B => R): R = pf.continue(pa)(c => flatMap(k(c))(f))
           }
-        })(a => f(a))
+        })(f)
 
       def pure[A](x: A): FreerP[P, A] = FreerP.pure(x)
     }
