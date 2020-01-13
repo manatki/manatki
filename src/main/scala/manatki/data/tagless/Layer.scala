@@ -2,6 +2,7 @@ package manatki.data.tagless
 
 import cats.Eval
 import cats.arrow.Profunctor
+import tofu.higherKind.Function2K
 import tofu.syntax.monadic._
 
 sealed trait LayerOr[-P[-_, +_], +A]
@@ -30,6 +31,11 @@ object Layer {
   }
 
   implicit class LayerOps[P[-_, +_]](private val layer: Layer[P]) extends AnyVal {
+    def contramapK2[Q[-_, +_]](f: FunK2[Q, P])(implicit Q: Profunctor[Q]): Layer[Q] = new Layer[Q] {
+      def unpack[A](q: Q[Layer[Q], A]): A =
+        layer.unpack[A](f(Q.lmap(q)((_: Layer[P]).contramapK2(f))))
+    }
+
     def fold[A](p: P[A, A])(implicit P: Profunctor[P]): A = layer.unpack(P.lmap(p)(_.fold(p)))
 
     def foldEval[A](p: P[Eval[A], Eval[A]])(implicit P: Profunctor[P]): Eval[A] =
@@ -44,6 +50,14 @@ object Layer {
       layer.unpack(P.lmap(p)(la => (Eval.defer(la.paraEval(p)), la)))
 
     def paraL[A](p: P[(A, Layer[P]), A])(implicit P: ProTraverse[P]): Eval[A] = paraEvalT[P, A](layer, P.protraverse(p))
+
+    def prepro[A](f: FunK2[P, P])(p: P[A, A])(implicit P: Profunctor[P]): A = layer.unpack(f(P.lmap(p)(_.prepro(f)(p))))
+
+    def preproEval[A](f: FunK2[P, P])(p: P[Eval[A], Eval[A]])(implicit P: Profunctor[P]): Eval[A] =
+      layer.unpack(f(P.lmap(p)(x => Eval.defer(x.preproEval(f)(p)))))
+
+    def preproL[A](f: FunK2[P, P])(p: P[A, A])(implicit P: ProTraverse[P]): Eval[A] =
+      layer.preproEval(f)(P.protraverse(p))
   }
 
   private def paraEvalT[P[-_, +_], A](l: Layer[P], p: P[Eval[(A, Layer[P])], Eval[A]])(

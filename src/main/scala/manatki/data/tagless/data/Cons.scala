@@ -23,7 +23,7 @@ object Cons {
   trait Trav[F[_], I, A, B, P[x, y] <: Cons[I, x, y]] extends ProTrav[F, A, B, P] with Cons[I, F[A], F[B]] {
     def cons(i: I, fa: F[A]): F[B] = fa.map(pab.cons(i, _))
   }
-По
+
   implicit def corepresentable[I]: ProTraverse[Cons[I, -*, +*]] = new ProTraverse[Cons[I, -*, +*]] {
     def tabulate[A, B](k: Rep[Cons[I, A, *]] => B): Cons[I, A, B] =
       new Tab[A, B, Cons[I, *, *]](k) with Tabulate[I, A, B, Cons[I, *, *]]

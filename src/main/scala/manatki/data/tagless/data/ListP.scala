@@ -1,9 +1,10 @@
 package manatki.data.tagless.data
-import cats.{Applicative, Show}
+import cats.{Applicative, Functor, Show}
 import manatki.data.tagless.ProCorepresentable.{LMap, Tab}
-import manatki.data.tagless.{Builder, Layer, ProCorepresentable, ProTraverse, Rep}
+import manatki.data.tagless.{Builder, FunK2, Layer, ProCorepresentable, ProTraverse, Rep}
 import cats.syntax.show._
 import cats.instances.string._
+import manatki.data.tagless.FunK2.{Arb1, Arb2}
 import manatki.data.tagless.ProTraverse.ProTrav
 
 trait ListP[-A, -I, +O] extends Cons[A, I, O] with Nil[O]
@@ -45,4 +46,14 @@ object ListP {
         case _   => show"$a, $y"
       }
     })
+
+  private def contramap[A, B, I, O](f: A => B)(l: ListP[B, I, O]) = new ListP[A, I, O] {
+    def nil: O              = l.nil
+    def cons(a: A, y: I): O = l.cons(f(a), y)
+  }
+
+  implicit val functor: Functor[XList] = new Functor[XList] {
+    def map[A, B](fa: XList[A])(f: A => B): XList[B] =
+      fa.contramapK2[ListP[B, -*, +*]](FunK2(contramap(f)(_)))
+  }
 }
