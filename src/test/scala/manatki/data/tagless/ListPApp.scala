@@ -1,6 +1,7 @@
 package manatki.data.tagless
 import manatki.data.tagless.data.ListP
 import tofu.syntax.monadic._
+import ProCorep.ops._
 
 object ListPApp extends App {
 
@@ -16,5 +17,5 @@ object ListPApp extends App {
 
 //  println(largeList.foldL(sum).value)
 //  println(largeList.foldL(toList).value)
-  println(largeList.map(_ + 1).foldL(ProCorepresentable.zip(sum, toList[Long])).value)
+  println(largeList.map(_ + 1).foldL(sum.zip(toList[Long])).value)
 }

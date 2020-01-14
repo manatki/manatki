@@ -1,9 +1,11 @@
 package manatki.data.tagless
 
 import cats.{Comonad, Eval, Monad, StackSafeMonad}
-import cats.arrow.Profunctor
+import cats.syntax.comonad._
+import cats.syntax.coflatMap._
 import manatki.data.tagless.FreerP.{Bind, Pure}
-import manatki.data.tagless.Rep.Pro
+import manatki.data.tagless.PTrans.PTag
+import manatki.data.tagless.Rep.prof
 import tofu.higherKind.Function2K
 import tofu.syntax.monadic._
 
@@ -33,87 +35,97 @@ object Layer {
   }
 
   implicit class LayerOps[P[-_, +_]](private val layer: Layer[P]) extends AnyVal {
-    def contramapK2[Q[-_, +_]](f: FunK2[Q, P])(implicit Q: Profunctor[Q]): Layer[Q] = new Layer[Q] {
+    def contramapK2[Q[-_, +_]](f: FunK2[Q, P])(implicit Q: Pro[Q]): Layer[Q] = new Layer[Q] {
       def unpack[A](q: Q[Layer[Q], A]): A =
         layer.unpack[A](f(Q.lmap(q)((_: Layer[P]).contramapK2(f))))
     }
 
-    def fold[A](p: P[A, A])(implicit P: Profunctor[P]): A = layer.unpack(P.lmap(p)(_.fold(p)))
+    def fold[A](p: P[A, A])(implicit P: Pro[P]): A = layer.unpack(P.lmap(p)(_.fold(p)))
 
-    def foldEval[A](p: P[Eval[A], Eval[A]])(implicit P: Profunctor[P]): Eval[A] =
+    def gfold[W[_]: Comonad, A](dist: PDistr[P, W])(p: P[W[A], A])(implicit P: Pro[P]): A = {
+      def go: P[Layer[P], W[Rep[P[W[A], *]]]] = P.lmap(dist.apply[W[A]])(_.unpack(go).map(_(p)).coflatten)
+      layer.unpack(go).extract.apply(p)
+    }
+
+    def foldEval[A](p: P[Eval[A], Eval[A]])(implicit P: Pro[P]): Eval[A] =
       layer.unpack(P.lmap(p)(x => Eval.defer(x.foldEval(p))))
 
     def foldL[A](p: P[A, A])(implicit P: ProTraverse[P]): Eval[A] = layer.foldEval(P.protraverse(p))
 
-    def para[A](p: P[(A, Layer[P]), A])(implicit P: ProCorepresentable[P]): A =
+    def para[A](p: P[(A, Layer[P]), A])(implicit P: ProCorep[P]): A =
       layer.unpack(P.lmap(p)(la => (la.para(p), la)))
 
-    def paraEval[A](p: P[(Eval[A], Layer[P]), Eval[A]])(implicit P: ProCorepresentable[P]): Eval[A] =
+    def paraEval[A](p: P[(Eval[A], Layer[P]), Eval[A]])(implicit P: ProCorep[P]): Eval[A] =
       layer.unpack(P.lmap(p)(la => (Eval.defer(la.paraEval(p)), la)))
 
     def paraL[A](p: P[(A, Layer[P]), A])(implicit P: ProTraverse[P]): Eval[A] = paraEvalT[P, A](layer, P.protraverse(p))
 
-    def prepro[A](f: FunK2[P, P])(p: P[A, A])(implicit P: Profunctor[P]): A = layer.unpack(f(P.lmap(p)(_.prepro(f)(p))))
+    def prepro[A](f: FunK2[P, P])(p: P[A, A])(implicit P: Pro[P]): A = layer.unpack(f(P.lmap(p)(_.prepro(f)(p))))
 
-    def preproEval[A](f: FunK2[P, P])(p: P[Eval[A], Eval[A]])(implicit P: Profunctor[P]): Eval[A] =
+    def preproEval[A](f: FunK2[P, P])(p: P[Eval[A], Eval[A]])(implicit P: Pro[P]): Eval[A] =
       layer.unpack(f(P.lmap(p)(x => Eval.defer(x.preproEval(f)(p)))))
 
     def preproL[A](f: FunK2[P, P])(p: P[A, A])(implicit P: ProTraverse[P]): Eval[A] =
       layer.preproEval(f)(P.protraverse(p))
+
+//    def histo[A](p: P[CofreerP[P, A], A])(implicit P: Pro[P]): A = {
+//      def go(x: CofreerP[P, A]): CofreerP[P, A] = ???
+//      layer.unpack(P.lmap(p)(go)).extract
+//    }
   }
 
   private def paraEvalT[P[-_, +_], A](l: Layer[P], p: P[Eval[(A, Layer[P])], Eval[A]])(
-      implicit P: ProCorepresentable[P]
+      implicit P: ProCorep[P]
   ): Eval[A] =
     l.unpack(P.lmap(p)(la => Eval.defer(paraEvalT(la, p).tupleRight(la))))
 
 }
 
 // aka coalgebra
-trait Builder[-P[_, _], A] {
+trait Builder[-P[-_, +_], A] {
   def continue[R](init: A, p: P[A, R]): R
 }
 
 object Builder {
 
-  def apply[P[_, _], A] = new Applied[P, A](true)
+  def apply[P[-_, +_], A] = new Applied[P, A](true)
 
-  class Applied[P[_, _], A](private val __ : Boolean) extends AnyVal {
+  class Applied[P[-_, +_], A](private val __ : Boolean) extends AnyVal {
     type Arb
 
     def apply(builder: ArbBuilder[P, A, Arb]): Builder[P, A] = builder
   }
 
-  abstract class ArbBuilder[P[_, _], A, W] extends Builder[P, A] {
+  abstract class ArbBuilder[P[-_, +_], A, W] extends Builder[P, A] {
     def continueArb(init: A, p: P[A, W]): W
 
     def continue[B](init: A, p: P[A, B]): B = continueArb(init, p.asInstanceOf[P[A, W]]).asInstanceOf[B]
   }
 
-  implicit class BuilderOps[P[_, _], A](private val builder: Builder[P, A]) extends AnyVal {
-    def hylo[B](p: P[B, B])(a: A)(implicit P: Profunctor[P]): B = builder.continue(a, P.lmap(p)(hylo(p)))
+  implicit class BuilderOps[P[-_, +_], A](private val builder: Builder[P, A]) extends AnyVal {
+    def hylo[B](p: P[B, B])(a: A)(implicit P: Pro[P]): B = builder.continue(a, P.lmap(p)(hylo(p)))
 
-    def hyloEval[B](p: P[Eval[B], Eval[B]])(a: A)(implicit P: Profunctor[P]): Eval[B] =
+    def hyloEval[B](p: P[Eval[B], Eval[B]])(a: A)(implicit P: Pro[P]): Eval[B] =
       builder.continue(a, P.lmap(p)(ea => Eval.defer(hyloEval(p)(ea))))
 
     def hyloL[B](p: P[B, B])(a: A)(implicit P: ProTraverse[P]): Eval[B] = hyloEval(P.protraverse(p))(a)
   }
 
   implicit class BuilderUnfoldOps[P[-_, +_], A](private val builder: Builder[P, A]) extends AnyVal {
-    def unfold(init: A)(implicit P: Profunctor[P]): Layer[P] =
+    def unfold(init: A)(implicit P: Pro[P]): Layer[P] =
       new Layer[P] {
         def unpack[B](p: P[Layer[P], B]): B =
           builder.continue(init, P.lmap(p)(unfold(_)))
       }
 
-    def postpro(f: FunK2[P, P])(init: A)(implicit P: Profunctor[P]): Layer[P] = new Layer[P] {
+    def postpro(f: FunK2[P, P])(init: A)(implicit P: Pro[P]): Layer[P] = new Layer[P] {
       def unpack[B](p: P[Layer[P], B]): B =
         builder.continue(init, f(P.lmap(p)(postpro(f)(_))))
     }
   }
 
   implicit class BuilderApoOps[P[-_, +_], A](private val builder: Builder[P, LayerOr[P, A]]) extends AnyVal {
-    def apo(init: A)(implicit P: Profunctor[P]): Layer[P] =
+    def apo(init: A)(implicit P: Pro[P]): Layer[P] =
       new Layer[P] {
         def unpack[B](p: P[Layer[P], B]): B =
           builder.continue(LayerVal(init), P.lmap(p) {
@@ -147,7 +159,7 @@ object CofreeP {
     def unpack[R](fk: P[CofreeP[P, A], R]): R = applyArbitrary(fk.asInstanceOf[P[CofreeP[P, A], Arb]]).asInstanceOf[R]
   }
 
-  implicit def cofreeInstance[P[-_, +_]](implicit P: Profunctor[P]): Comonad[CofreeP[P, *]] =
+  implicit def cofreeInstance[P[-_, +_]](implicit P: Pro[P]): Comonad[CofreeP[P, *]] =
     new Comonad[CofreeP[P, *]] {
       def extract[A](x: CofreeP[P, A]): A = x.value
       def coflatMap[A, B](fa: CofreeP[P, A])(f: CofreeP[P, A] => B): CofreeP[P, B] =
@@ -189,7 +201,7 @@ object FreeP {
       applyArbitrary(fk.asInstanceOf[P[FreeP[P, A], Arb]]).asInstanceOf[R]
   }
 
-  implicit def freeMonad[P[-_, +_]](implicit P: Profunctor[P]): Monad[FreeP[P, *]] =
+  implicit def freeMonad[P[-_, +_]](implicit P: Pro[P]): Monad[FreeP[P, *]] =
     new StackSafeMonad[FreeP[P, *]] {
       def flatMap[A, B](fa: FreeP[P, A])(f: A => FreeP[P, B]): FreeP[P, B] = new FreeP[P, B] {
         def unpack[R](pf: P[FreeP[P, B], R])(br: B => R): R =
@@ -201,7 +213,6 @@ object FreeP {
 
 sealed trait FreerP[-P[-_, +_], +A] {
   def flatMap[Q[-i, +o] <: P[i, o], B](f: A => FreerP[Q, B]): FreerP[Q, B]
-
 }
 
 object FreerP {
@@ -260,15 +271,33 @@ object CofreerP {
 }
 
 object PTrans {
-  type Arb
-
   type T[+P[-_, +_], +F[_]] <: PTag
 
   trait PTag extends Any
 
-  def apply[P[-_, +_], F[_]](p: P[Arb, F[Arb]]): T[P, F] = p.asInstanceOf[T[P, F]]
+  def apply[P[-_, +_], F[_]] = new Make[P, F](true)
+
+  class Make[P[-_, +_], F[_]](private val __ : Boolean) extends AnyVal {
+    type Arb
+    def apply(p: P[Arb, F[Arb]]): T[P, F] = p.asInstanceOf[T[P, F]]
+  }
 
   implicit class PTransOps[P[-_, +_], F[_]](private val t: T[P, F]) extends AnyVal {
     def apply[A]: P[A, F[A]] = t.asInstanceOf[P[A, F[A]]]
+  }
+}
+
+object PDistr {
+  type T[+P[-_, +_], -F[_]] <: PTag
+
+  def apply[P[-_, +_], F[_]] = new Make[P, F](true)
+
+  class Make[P[-_, +_], F[_]](private val __ : Boolean) extends AnyVal {
+    type Arb
+    def apply(p: P[F[Arb], F[Rep[P[Arb, *]]]]): T[P, F] = p.asInstanceOf[T[P, F]]
+  }
+
+  implicit class PDistrOps[P[-_, +_], F[_]](private val t: T[P, F]) extends AnyVal {
+    def apply[A]: P[F[A], F[Rep[P[A, *]]]] = t.asInstanceOf[P[F[A], F[Rep[P[A, *]]]]]
   }
 }
