@@ -1,13 +1,11 @@
 package manatki.data.tagless
 
-import cats.{Comonad, Eval, Monad, StackSafeMonad}
-import cats.syntax.comonad._
 import cats.syntax.coflatMap._
-import manatki.data.tagless.FreerP.{Bind, Pure}
+import cats.syntax.comonad._
+import cats.{Comonad, Eval, Monad, StackSafeMonad}
 import manatki.data.tagless.PTrans.PTag
-import manatki.data.tagless.Rep.prof
-import tofu.higherKind.Function2K
 import tofu.syntax.monadic._
+import cats.syntax.either._
 
 sealed trait LayerOr[-P[-_, +_], +A]
 
@@ -73,14 +71,13 @@ object Layer {
 
   private def cofreeDist[P[-_, +_]](implicit P: ProCorep[P]): PDistr[P, CofreeP[P, *]] = {
     def pdist[A]: P[CofreeP[P, A], CofreeP[P, Rep[P[A, *]]]] =
-      P.tabulate(
-        rep =>
-          new CofreeP[P, Rep[P[A, *]]] {
-            def value: Rep[P[A, *]] = rep.pmap(_.value)
-            def unpack[R](p: P[CofreeP[P, Rep[P[A, *]]], R]): R =
-              rep(P.lmap(p)(_.unpack(pdist)))
-          }
-      )
+      P.tabulate { rep =>
+        new CofreeP[P, Rep[P[A, *]]] {
+          def value: Rep[P[A, *]] = rep.pmap(_.value)
+          def unpack[R](p: P[CofreeP[P, Rep[P[A, *]]], R]): R =
+            rep(P.lmap(p)(_.unpack(pdist)))
+        }
+      }
     PDistr[P, CofreeP[P, *]](pdist)
   }
 
@@ -112,15 +109,6 @@ object Builder {
     def continue[B](init: A, p: P[A, B]): B = continueArb(init, p.asInstanceOf[P[A, W]]).asInstanceOf[B]
   }
 
-  implicit class BuilderOps[P[-_, +_], A](private val builder: Builder[P, A]) extends AnyVal {
-    def hylo[B](p: P[B, B])(a: A)(implicit P: Pro[P]): B = builder.continue(a, P.lmap(p)(hylo(p)))
-
-    def hyloEval[B](p: P[Eval[B], Eval[B]])(a: A)(implicit P: Pro[P]): Eval[B] =
-      builder.continue(a, P.lmap(p)(ea => Eval.defer(hyloEval(p)(ea))))
-
-    def hyloL[B](p: P[B, B])(a: A)(implicit P: ProTraverse[P]): Eval[B] = hyloEval(P.protraverse(p))(a)
-  }
-
   implicit class BuilderUnfoldOps[P[-_, +_], A](private val builder: Builder[P, A]) extends AnyVal {
     def unfold(init: A)(implicit P: Pro[P]): Layer[P] =
       new Layer[P] {
@@ -128,10 +116,19 @@ object Builder {
           builder.continue(init, P.lmap(p)(unfold(_)))
       }
 
+//    def gunfold[M[_]: Monad]()(init: A)
+
     def postpro(f: FunK2[P, P])(init: A)(implicit P: Pro[P]): Layer[P] = new Layer[P] {
       def unpack[B](p: P[Layer[P], B]): B =
         builder.continue(init, f(P.lmap(p)(postpro(f)(_))))
     }
+
+    def hylo[B](p: P[B, B])(a: A)(implicit P: Pro[P]): B = builder.continue(a, P.lmap(p)(hylo(p)))
+
+    def hyloEval[B](p: P[Eval[B], Eval[B]])(a: A)(implicit P: Pro[P]): Eval[B] =
+      builder.continue(a, P.lmap(p)(ea => Eval.defer(hyloEval(p)(ea))))
+
+    def hyloL[B](p: P[B, B])(a: A)(implicit P: ProTraverse[P]): Eval[B] = hyloEval(P.protraverse(p))(a)
   }
 
   implicit class BuilderApoOps[P[-_, +_], A](private val builder: Builder[P, LayerOr[P, A]]) extends AnyVal {
@@ -189,6 +186,7 @@ object CofreeP {
 
 trait FreeP[-P[-_, +_], +A] {
   def unpack[R](pf: P[FreeP[P, A], R])(ar: A => R): R
+
 }
 
 object FreeP {
@@ -202,6 +200,11 @@ object FreeP {
   class Applied[P[-_, +_], A](private val __ : Boolean) extends AnyVal {
     type Arb
     def apply(maker: MakeLayer[P, A, Arb]): FreeP[P, A] = maker
+  }
+
+  implicit class FreeMonadOps[P[-_, +_], A](private val self: FreeP[P, A]) extends AnyVal {
+    def foldMap[M[+_]: Monad](f: PTrans[P, M])(implicit P: Pro[P]): M[A] =
+      self.tailRecM[M, A](_.unpack(P.rmap(f[FreeP[P, A]])(_.map(_.asLeft[A])))(a => a.asRight.pure[M]))
   }
 
   abstract class MakeLayer[P[-_, +_], A, Arb] extends FreeP[P, A] {
@@ -298,7 +301,7 @@ object PTrans {
 }
 
 object PDistr {
-  type T[+P[-_, +_], -F[_]] <: PTag
+  type T[P[-_, +_], F[_]] <: PTag
 
   def apply[P[-_, +_], F[_]] = new Make[P, F](true)
 
@@ -309,5 +312,27 @@ object PDistr {
 
   implicit class PDistrOps[P[-_, +_], F[_]](private val t: T[P, F]) extends AnyVal {
     def apply[A]: P[F[A], F[Rep[P[A, *]]]] = t.asInstanceOf[P[F[A], F[Rep[P[A, *]]]]]
+  }
+}
+
+trait PCodistr[P[-_, +_], F[_]] {
+  def apply[A, R](mr: F[Rep[P[A, *]]], pr: P[F[A], R]): R
+}
+
+object PCodistr {
+  def apply[P[-_, +_], F[_]] = new Make[P, F](true)
+
+  class Make[P[-_, +_], F[_]](private val __ : Boolean) extends AnyVal {
+    type Arb1
+    type Arb2
+
+    def apply(maker: Maker[P, F, Arb1, Arb2]): PCodistr[P, F] = maker
+  }
+
+  trait Maker[P[-_, +_], F[_], AA, AR] extends PCodistr[P, F] {
+    def applyArb(mr: F[Rep[P[AA, *]]], pr: P[F[AA], AR]): AR
+
+    def apply[A, R](mr: F[Rep[P[A, *]]], pr: P[F[A], R]): R =
+      applyArb(mr.asInstanceOf[F[Rep[P[AA, *]]]], pr.asInstanceOf[P[F[AA], AR]]).asInstanceOf[R]
   }
 }
