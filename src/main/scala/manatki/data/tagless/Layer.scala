@@ -68,10 +68,20 @@ object Layer {
     def preproL[A](f: FunK2[P, P])(p: P[A, A])(implicit P: ProTraverse[P]): Eval[A] =
       layer.preproEval(f)(P.protraverse(p))
 
-//    def histo[A](p: P[CofreerP[P, A], A])(implicit P: Pro[P]): A = {
-//      def go(x: CofreerP[P, A]): CofreerP[P, A] = ???
-//      layer.unpack(P.lmap(p)(go)).extract
-//    }
+    def histo[A](p: P[CofreeP[P, A], A])(implicit P: ProCorep[P]): A = gfold(cofreeDist)(p)
+  }
+
+  private def cofreeDist[P[-_, +_]](implicit P: ProCorep[P]): PDistr[P, CofreeP[P, *]] = {
+    def pdist[A]: P[CofreeP[P, A], CofreeP[P, Rep[P[A, *]]]] =
+      P.tabulate(
+        rep =>
+          new CofreeP[P, Rep[P[A, *]]] {
+            def value: Rep[P[A, *]] = rep.pmap(_.value)
+            def unpack[R](p: P[CofreeP[P, Rep[P[A, *]]], R]): R =
+              rep(P.lmap(p)(_.unpack(pdist)))
+          }
+      )
+    PDistr[P, CofreeP[P, *]](pdist)
   }
 
   private def paraEvalT[P[-_, +_], A](l: Layer[P], p: P[Eval[(A, Layer[P])], Eval[A]])(

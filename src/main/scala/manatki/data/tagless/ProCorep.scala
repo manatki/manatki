@@ -34,6 +34,14 @@ object Rep {
 
     def apply[R](fk: T[R]): R = applyArbitrary(fk.asInstanceOf[T[Arb]]).asInstanceOf[R]
   }
+
+  implicit def prorepFunctor[P[-_, +_]](implicit P: Pro[P]): Functor[prof[P, *]] = new Functor[prof[P, *]] {
+    def map[A, B](fa: prof[P, A])(f: A => B): prof[P, B] = Rep.pro[P, B](p => fa(P.lmap(p)(f)))
+  }
+
+  implicit class ProfRepOps[P[-_, +_], A](private val self: Rep[P[A, *]]) extends AnyVal {
+    def pmap[B](f: A => B)(implicit P: Pro[P]): Rep[P[B, *]] = Rep.pro[P, B](p => self(P.lmap(p)(f)))
+  }
 }
 
 trait Representable[F[_]] {
