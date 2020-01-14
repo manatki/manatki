@@ -2,7 +2,7 @@ package manatki.data.tagless
 
 import cats.{Comonad, Eval, Monad, StackSafeMonad}
 import cats.arrow.Profunctor
-import manatki.data.tagless.FreerP.Bind
+import manatki.data.tagless.FreerP.{Bind, Pure}
 import manatki.data.tagless.Rep.Pro
 import tofu.higherKind.Function2K
 import tofu.syntax.monadic._
@@ -199,65 +199,63 @@ object FreeP {
     }
 }
 
-trait FreerP[-P[-_, +_], +A] {
-  def unpack[R](fb: FreerP.Bind[P, A, R])(ar: A => R): R
+sealed trait FreerP[-P[-_, +_], +A] {
+  def flatMap[Q[-i, +o] <: P[i, o], B](f: A => FreerP[Q, B]): FreerP[Q, B]
+
 }
 
 object FreerP {
-  trait Bind[+P[-_, +_], -B, R] {
-    def continue[A](pa: Rep.Pro[P, A])(k: A => FreerP[P, B]): R
+  final case class Pure[+A](a: A) extends FreerP[Any, A] {
+    def flatMap[Q[-i, +o] <: Any, B](f: A => FreerP[Q, B]): FreerP[Q, B] = f(a)
   }
 
-  def pure[A](x: A): FreerP[Any, A] = new FreerP[Any, A] {
-    def unpack[R](fb: Bind[Any, A, R])(ar: A => R): R = ar(x)
+  abstract class Bind[-P[-_, +_], X, +A] extends FreerP[P, A] { self =>
+    def rep[R](pr: P[X, R]): R
+    def continue(pin: X): FreerP[P, A]
+    def flatMap[Q[-i, +o] <: P[i, o], B](f: A => FreerP[Q, B]): Bind[Q, X, B] =
+      new Bind[Q, X, B] {
+        def rep[R](pr: Q[X, R]): R         = self.rep(pr)
+        def continue(pin: X): FreerP[Q, B] = self.continue(pin).flatMap(f)
+        override def flatMap[U[-i, +o] <: Q[i, o], C](g: B => FreerP[U, C]): Bind[U, X, C] =
+          self.flatMap(a => f(a).flatMap(g))
+      }
+
   }
+
+  def pure[A](x: A): FreerP[Any, A] = Pure(x)
 
   implicit def freerMonad[P[-_, +_]]: Monad[FreerP[P, *]] =
     new StackSafeMonad[FreerP[P, *]] {
-      def flatMap[A, B](fa: FreerP[P, A])(f: A => FreerP[P, B]): FreerP[P, B] =
-        fa.unpack(new Bind[P, A, FreerP[P, B]] {
-          def continue[C](pa: Pro[P, C])(k: C => FreerP[P, A]): FreerP[P, B] = new FreerP[P, B] {
-            def unpack[R](fb: Bind[P, B, R])(ar: B => R): R = fb.continue(pa)(c => flatMap(k(c))(f))
-          }
-        })(f)
 
-      def pure[A](x: A): FreerP[P, A] = FreerP.pure(x)
+      def flatMap[A, B](fa: FreerP[P, A])(f: A => FreerP[P, B]): FreerP[P, B] = fa.flatMap(f)
+      def pure[A](x: A): FreerP[P, A]                                         = Pure(x)
     }
 }
 
-trait CofreerP[-P[-_, +_], +A] {
-  def unpack[R](pb: CofreerP.Bind[P, A, R]): R
+trait CofreerP[-P[-_, +_], +A] { self =>
+  type Pin
+  def value: A
+  def rep[R](pr: P[Pin, R]): R
+  def continue(pin: Pin): CofreerP[P, A]
 
-  def value: A =
-    unpack(new CofreerP.Bind[P, A, A] {
-      def continue[X](b: A, px: Pro[P, X])(k: X => CofreerP[P, A]): A = b
-    })
+  def coflatMap[B](f: CofreerP[P, A] => B): CofreerP[P, B] = new CofreerP[P, B] { inner =>
+    type Pin = self.Pin
+    def value: B                           = f(self)
+    def rep[R](pr: P[Pin, R]): R           = self.rep(pr)
+    def continue(pin: Pin): CofreerP[P, B] = self.continue(pin).coflatMap(f)
+
+    override def coflatMap[C](g: CofreerP[P, B] => C): CofreerP[P, C] = self.coflatMap(fa => g(fa.coflatMap(f)))
+  }
+
+  def map[B](f: A => B): CofreerP[P, B] = coflatMap(fa => f(fa.value))
 }
 
 object CofreerP {
-  trait Bind[+P[-_, +_], -B, R] {
-    def continue[X](b: B, px: Rep.Pro[P, X])(k: X => CofreerP[P, B]): R
-  }
-
   implicit def cofreerComonad[P[-_, +_]]: Comonad[CofreerP[P, *]] =
     new Comonad[CofreerP[P, *]] {
-      def extract[A](x: CofreerP[P, A]): A = x.value
-      def coflatMap[A, B](fa: CofreerP[P, A])(f: CofreerP[P, A] => B): CofreerP[P, B] =
-        new CofreerP[P, B] {
-          def unpack[R](pb: Bind[P, B, R]): R =
-            fa.unpack(new Bind[P, A, R] {
-              def continue[X](b: A, px: Pro[P, X])(k: X => CofreerP[P, A]): R =
-                pb.continue(f(fa), px)(x => coflatMap(k(x))(f))
-            })
-        }
-      def map[A, B](fa: CofreerP[P, A])(f: A => B): CofreerP[P, B] =
-        new CofreerP[P, B] {
-          def unpack[R](pb: Bind[P, B, R]): R =
-            fa.unpack(new Bind[P, A, R] {
-              def continue[X](a: A, px: Pro[P, X])(k: X => CofreerP[P, A]): R =
-                pb.continue(f(a), px)(x => map(k(x))(f))
-            })
-        }
+      def extract[A](x: CofreerP[P, A]): A                                            = x.value
+      def coflatMap[A, B](fa: CofreerP[P, A])(f: CofreerP[P, A] => B): CofreerP[P, B] = fa.coflatMap(f)
+      def map[A, B](fa: CofreerP[P, A])(f: A => B): CofreerP[P, B]                    = fa.map(f)
     }
 }
 
