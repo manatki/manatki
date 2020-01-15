@@ -166,6 +166,11 @@ object CofreeP {
     def unpack[R](fk: P[CofreeP[P, A], R]): R = applyArbitrary(fk.asInstanceOf[P[CofreeP[P, A], Arb]]).asInstanceOf[R]
   }
 
+  def unfoldMap[P[-_, +_], W[_]: Comonad, A](f: PCotrans[P, W])(wa: W[A]): CofreeP[P, A] = new CofreeP[P, A] {
+    def value: A                             = wa.extract
+    def unpack[R](p: P[CofreeP[P, A], R]): R = f.apply(wa.coflatMap(unfoldMap(f)), p)
+  }
+
   implicit def cofreeInstance[P[-_, +_]](implicit P: Pro[P]): Comonad[CofreeP[P, *]] =
     new Comonad[CofreeP[P, *]] {
       def extract[A](x: CofreeP[P, A]): A = x.value
@@ -186,7 +191,6 @@ object CofreeP {
 
 trait FreeP[-P[-_, +_], +A] {
   def unpack[R](pf: P[FreeP[P, A], R])(ar: A => R): R
-
 }
 
 object FreeP {
@@ -233,7 +237,7 @@ object FreerP {
     def flatMap[Q[-i, +o] <: Any, B](f: A => FreerP[Q, B]): FreerP[Q, B] = f(a)
   }
 
-  abstract class Bind[-P[-_, +_], X, +A] extends FreerP[P, A] { self =>
+  trait Bind[-P[-_, +_], X, +A] extends FreerP[P, A] { self =>
     def rep[R](pr: P[X, R]): R
     def continue(pin: X): FreerP[P, A]
     def flatMap[Q[-i, +o] <: P[i, o], B](f: A => FreerP[Q, B]): Bind[Q, X, B] =
@@ -248,9 +252,16 @@ object FreerP {
 
   def pure[A](x: A): FreerP[Any, A] = Pure(x)
 
+  implicit class FreerPOps[P[-_, +_], A](private val pa: FreerP[P, A]) extends AnyVal {
+    def foldMap[M[_]: Monad](trans: PTrans[P, M]): M[A] =
+      pa.tailRecM {
+        case Pure(a)             => a.asRight.pure[M]
+        case bind: Bind[P, x, A] => bind.rep(trans[x]).map(x => Left(bind.continue(x)))
+      }
+  }
+
   implicit def freerMonad[P[-_, +_]]: Monad[FreerP[P, *]] =
     new StackSafeMonad[FreerP[P, *]] {
-
       def flatMap[A, B](fa: FreerP[P, A])(f: A => FreerP[P, B]): FreerP[P, B] = fa.flatMap(f)
       def pure[A](x: A): FreerP[P, A]                                         = Pure(x)
     }
@@ -275,6 +286,14 @@ trait CofreerP[-P[-_, +_], +A] { self =>
 }
 
 object CofreerP {
+
+  def unfoldMap[P[-_, +_], W[_]: Comonad, A](f: PCotrans[P, W])(wa: W[A]): CofreerP[P, A] = new CofreerP[P, A] {
+    type Pin = CofreerP[P, A]
+    def value: A                                      = wa.extract
+    def rep[R](pr: P[CofreerP[P, A], R]): R           = f(wa.coflatMap(unfoldMap(f)), pr)
+    def continue(pin: CofreerP[P, A]): CofreerP[P, A] = pin
+  }
+
   implicit def cofreerComonad[P[-_, +_]]: Comonad[CofreerP[P, *]] =
     new Comonad[CofreerP[P, *]] {
       def extract[A](x: CofreerP[P, A]): A                                            = x.value
@@ -297,6 +316,28 @@ object PTrans {
 
   implicit class PTransOps[P[-_, +_], F[_]](private val t: T[P, F]) extends AnyVal {
     def apply[A]: P[A, F[A]] = t.asInstanceOf[P[A, F[A]]]
+  }
+}
+
+trait PCotrans[-P[-_, +_], -W[_]] {
+  def apply[A, R](wa: W[A], par: P[A, R]): R
+}
+
+object PCotrans {
+  def apply[P[-_, +_], W[_]] = new Make[P, W](true)
+
+  class Make[P[-_, +_], W[_]](private val __ : Boolean) extends AnyVal {
+    type Arb1
+    type Arb2
+
+    def apply(maker: Maker[P, W, Arb1, Arb2]): PCotrans[P, W] = maker
+  }
+
+  trait Maker[P[-_, +_], W[_], AA, AR] extends PCotrans[P, W] {
+    def applyArb(mr: W[AA], pr: P[AA, AR]): AR
+
+    def apply[A, R](wa: W[A], par: P[A, R]): R =
+      applyArb(wa.asInstanceOf[W[AA]], par.asInstanceOf[P[AA, AR]]).asInstanceOf[R]
   }
 }
 
