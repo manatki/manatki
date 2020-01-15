@@ -2,7 +2,7 @@ package manatki.data.tagless
 
 import cats.syntax.coflatMap._
 import cats.syntax.comonad._
-import cats.{Comonad, Eval, Monad, StackSafeMonad}
+import cats.{Comonad, Eval, Id, Monad, StackSafeMonad}
 import manatki.data.tagless.PTrans.PTag
 import tofu.syntax.monadic._
 import cats.syntax.either._
@@ -41,7 +41,7 @@ object Layer {
     def fold[A](p: P[A, A])(implicit P: Pro[P]): A = layer.unpack(P.lmap(p)(_.fold(p)))
 
     def gfold[W[_]: Comonad, A](dist: PDistr[P, W])(p: P[W[A], A])(implicit P: Pro[P]): A = {
-      def go: P[Layer[P], W[Rep[P[W[A], *]]]] = P.lmap(dist.apply[W[A]])(_.unpack(go).map(_(p)).coflatten)
+      lazy val go: P[Layer[P], W[Rep[P[W[A], *]]]] = P.lmap(dist.apply[W[A]])(_.unpack(go).map(_(p)).coflatten)
       layer.unpack(go).extract.apply(p)
     }
 
@@ -88,9 +88,56 @@ object Layer {
 
 }
 
-// aka coalgebra
-trait Builder[-P[-_, +_], A] {
-  def continue[R](init: A, p: P[A, R]): R
+// aka generalized coalgebra
+trait GBuilder[-P[-_, _], F[_], A] {
+  def continue[R](init: A, p: P[F[A], R]): R
+}
+
+object GBuilder {
+  implicit class BuilderUnfoldOps[P[-_, +_], A](private val builder: Builder[P, A]) extends AnyVal {
+    def unfold(init: A)(implicit P: Pro[P]): Layer[P] =
+      new Layer[P] {
+        def unpack[B](p: P[Layer[P], B]): B =
+          builder.continue(init, P.lmap(p)(unfold(_)))
+      }
+    def postpro(f: FunK2[P, P])(init: A)(implicit P: Pro[P]): Layer[P] = new Layer[P] {
+      def unpack[B](p: P[Layer[P], B]): B =
+        builder.continue(init, f(P.lmap(p)(postpro(f)(_))))
+    }
+
+    def hylo[B](p: P[B, B])(a: A)(implicit P: Pro[P]): B = builder.continue(a, P.lmap(p)(hylo(p)))
+
+    def hyloEval[B](p: P[Eval[B], Eval[B]])(a: A)(implicit P: Pro[P]): Eval[B] =
+      builder.continue(a, P.lmap(p)(ea => Eval.defer(hyloEval(p)(ea))))
+
+    def hyloL[B](p: P[B, B])(a: A)(implicit P: ProTraverse[P]): Eval[B] = hyloEval(P.protraverse(p))(a)
+  }
+
+  implicit class BuilderApoOps[P[-_, +_], A](private val builder: Builder[P, LayerOr[P, A]]) extends AnyVal {
+    def apo(init: A)(implicit P: Pro[P]): Layer[P] =
+      new Layer[P] {
+        def unpack[B](p: P[Layer[P], B]): B =
+          builder(LayerVal(init), P.lmap(p) {
+            case l: Layer[P] => l
+            case LayerVal(a) => apo(a)
+          })
+      }
+  }
+
+  implicit class GBuilderOps[P[-_, +_], F[_], A](private val builder: GBuilder[P, F, A]) extends AnyVal {
+    def apply[R](init: A, p: P[F[A], R]): R = builder.continue(init, p)
+
+    def gunfold(dist: PCodistr[P, F])(init: A)(implicit P: Pro[P], F: Monad[F]): Layer[P] = {
+      def go(fra: F[Rep[P[F[A], *]]]): Layer[P] =
+        Layer[P](p => dist(fra, P.lmap(p)((ffa: F[F[A]]) => go(ffa.flatten.map(a => Rep.pro[P, F[A]](builder(a, _)))))))
+
+      go(Rep.pro[P, F[A]](p => builder(init, p)).pure)
+    }
+  }
+
+  //  implicit class BuilderFutuOps[P[-_, +_], A](private val builder: Builder[P, FreeP[P, A]]) extends AnyVal {
+  //    def futu(init: A)(implicit P: Pro[P]): Layer[P] = ???
+  //  }
 }
 
 object Builder {
@@ -109,38 +156,6 @@ object Builder {
     def continue[B](init: A, p: P[A, B]): B = continueArb(init, p.asInstanceOf[P[A, W]]).asInstanceOf[B]
   }
 
-  implicit class BuilderUnfoldOps[P[-_, +_], A](private val builder: Builder[P, A]) extends AnyVal {
-    def unfold(init: A)(implicit P: Pro[P]): Layer[P] =
-      new Layer[P] {
-        def unpack[B](p: P[Layer[P], B]): B =
-          builder.continue(init, P.lmap(p)(unfold(_)))
-      }
-
-//    def gunfold[M[_]: Monad]()(init: A)
-
-    def postpro(f: FunK2[P, P])(init: A)(implicit P: Pro[P]): Layer[P] = new Layer[P] {
-      def unpack[B](p: P[Layer[P], B]): B =
-        builder.continue(init, f(P.lmap(p)(postpro(f)(_))))
-    }
-
-    def hylo[B](p: P[B, B])(a: A)(implicit P: Pro[P]): B = builder.continue(a, P.lmap(p)(hylo(p)))
-
-    def hyloEval[B](p: P[Eval[B], Eval[B]])(a: A)(implicit P: Pro[P]): Eval[B] =
-      builder.continue(a, P.lmap(p)(ea => Eval.defer(hyloEval(p)(ea))))
-
-    def hyloL[B](p: P[B, B])(a: A)(implicit P: ProTraverse[P]): Eval[B] = hyloEval(P.protraverse(p))(a)
-  }
-
-  implicit class BuilderApoOps[P[-_, +_], A](private val builder: Builder[P, LayerOr[P, A]]) extends AnyVal {
-    def apo(init: A)(implicit P: Pro[P]): Layer[P] =
-      new Layer[P] {
-        def unpack[B](p: P[Layer[P], B]): B =
-          builder.continue(LayerVal(init), P.lmap(p) {
-            case l: Layer[P] => l
-            case LayerVal(a) => apo(a)
-          })
-      }
-  }
 }
 
 trait CofreeP[-P[-_, +_], +A] {
