@@ -1,8 +1,17 @@
 package manatki.data
 import cats.{Monad, StackSafeMonad}
+import manatki.free.FunK
+import tofu.syntax.monadic._
+import cats.syntax.either._
+import manatki.data.Freer.Bind
 
 sealed trait Freer[+F[_], A] {
   def flatMap[G[x] >: F[x], B](f: A => Freer[G, B]): Freer[G, B]
+  def foldMap[G[_]: Monad](f: FunK[F, G]): G[A] = this.tailRecM {
+    case Freer.Pure(a)          => a.asRight.pure[G]
+    case bind: Freer.Bind[F, A] => f(bind.head).map(a => bind.cont(a).asLeft)
+  }
+  def mapK[G[_]](f: FunK[F, G]): Freer[G, A]
 }
 
 object Freer {
@@ -13,19 +22,31 @@ object Freer {
     def cont(a: A): Freer[F, A] = pure(a)
   }
 
+  implicit class FreerOps[F[_], A](private val self: Freer[F, A]) extends AnyVal {
+    def runTailRec(implicit F: Monad[F]) = self.foldMap(FunK.id)
+  }
+
   final case class Pure[A](a: A) extends Freer[Nothing, A] {
-    def flatMap[G[_], B](f: A => Freer[G, B]) = f(a)
+    def flatMap[G[_], B](f: A => Freer[G, B])        = f(a)
+    def mapK[G[_]](f: FunK[Nothing, G]): Freer[G, A] = this
   }
 
   trait Bind[+F[_], A] extends Freer[F, A] { self =>
     type Pin
     def head: F[Pin]
     def cont(a: Pin): Freer[F, A]
+
     def flatMap[G[x] >: F[x], B](f: A => Freer[G, B]): Bind[G, B] = new Bind[G, B] {
       type Pin = self.Pin
       def head                                                               = self.head
       def cont(a: Pin)                                                       = self.cont(a).flatMap[G, B](f)
       override def flatMap[H[x] >: G[x], C](g: B => Freer[H, C]): Bind[H, C] = self.flatMap(a => f(a).flatMap(g))
+    }
+
+    def mapK[G[_]](f: FunK[F, G]): Freer[G, A] = new Bind[G, A] {
+      type Pin = self.Pin
+      def head: G[Pin]              = f(self.head)
+      def cont(a: Pin): Freer[G, A] = self.cont(a).mapK(f)
     }
   }
 
