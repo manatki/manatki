@@ -66,32 +66,7 @@ object Layer {
     def preproL[A](f: FunK2[P, P])(p: P[A, A])(implicit P: ProTraverse[P]): Eval[A] =
       layer.preproEval(f)(P.protraverse(p))
 
-    def histo[A](p: P[CofreeP[P, A], A])(implicit P: ProCorep[P]): A = {
-      lazy val pdist: P[CofreeP[P, CofreeP[P, A]], CofreeP[P, Rep[P[CofreeP[P, A], *]]]] =
-        P.tabulate { rep =>
-          new CofreeP[P, Rep[P[CofreeP[P, A], *]]] {
-            def value: Rep[P[CofreeP[P, A], *]] = rep.pmap(_.value)
-            def unpack[R](p: P[CofreeP[P, Rep[P[CofreeP[P, A], *]]], R]): R =
-              rep(P.lmap(p)(_.unpack(pdist)))
-          }
-        }
-
-      lazy val go: P[Layer[P], CofreeP[P, Rep[P[CofreeP[P, A], *]]]] =
-        P.lmap(pdist)(_.unpack(go).map(_(p)).coflatten)
-
-      lazy val go1: P[Layer[P], CofreeP[P, Rep[P[CofreeP[P, A], *]]]] =
-        P.tabulate { rep =>
-          new CofreeP[P, Rep[P[CofreeP[P, A], *]]] {
-            def value: Rep[P[CofreeP[P, A], *]] = rep.pmap(_.unpack(go1).map(_(p)).coflatten.value)
-            def unpack[R](p1: P[CofreeP[P, Rep[P[CofreeP[P, A], *]]], R]): R =
-              rep(P.lmap(p1)(_.unpack(go1).map(_(p)).coflatten.unpack(pdist)))
-          }
-        }
-
-      layer.unpack(go).extract.apply(p)
-
-      gfold(cofreeDist)(p)
-    }
+    def histo[A](p: P[CofreeP[P, A], A])(implicit P: ProCorep[P]): A = gfold(cofreeDist)(p)
   }
 
   private def cofreeDist[P[-_, +_]](implicit P: ProCorep[P]): PDistr[P, CofreeP[P, *]] = {
