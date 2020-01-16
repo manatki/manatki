@@ -29,8 +29,9 @@ object Freer {
   }
 
   final case class Pure[A](a: A) extends Freer[Nothing, A] {
-    def flatMap[G[_], B](f: A => Freer[G, B])        = f(a)
-    def mapK[G[_]](f: FunK[Nothing, G]): Freer[G, A] = this
+    def flatMap[G[_], B](f: A => Freer[G, B])                    = f(a)
+    def mapK[G[_]](f: FunK[Nothing, G]): Freer[G, A]             = this
+    override def foldMap[G[_]: Monad](f: FunK[Nothing, G]): G[A] = a.pure[G]
   }
 
   abstract class Bind[+F[_], Pin, A](val head: F[Pin]) extends Freer[F, A] { self =>
