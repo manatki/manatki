@@ -135,9 +135,15 @@ object GBuilder {
     }
   }
 
-  //  implicit class BuilderFutuOps[P[-_, +_], A](private val builder: Builder[P, FreeP[P, A]]) extends AnyVal {
-  //    def futu(init: A)(implicit P: Pro[P]): Layer[P] = ???
-  //  }
+  private def freeСodist[P[-_, +_]](implicit P: Pro[P]): PCodistr[P, FreeP[P, *]] =
+    new PCodistr[P, FreeP[P, *]] {
+      override def apply[A, R](mr: FreeP[P, Rep[P[A, *]]], pr: P[FreeP[P, A], R]): R =
+        mr.unpack(P.lmap(pr)(fp => FreeP[P, A](this(fp, _))))(_(P.lmap(pr)(FreeP.pure)))
+    }
+
+  implicit class BuilderFutuOps[P[-_, +_], A](private val builder: GBuilder[P, FreeP[P, *], A]) extends AnyVal {
+    def futu(init: A)(implicit P: Pro[P]): Layer[P] = builder.gunfold(freeСodist[P])(init)
+  }
 }
 
 object Builder {

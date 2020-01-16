@@ -5,7 +5,7 @@ import manatki.data.tagless.Rep.prof
 import simulacrum.typeclass
 
 trait Rep[-F[_]] {
-  def apply[A](fa: F[A]): A
+  def apply[R](fa: F[R]): R
 }
 
 @typeclass
