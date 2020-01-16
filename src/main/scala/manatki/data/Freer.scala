@@ -8,16 +8,15 @@ import manatki.data.Freer.Bind
 sealed trait Freer[+F[_], A] {
   def flatMap[G[x] >: F[x], B](f: A => Freer[G, B]): Freer[G, B]
   def foldMap[G[_]: Monad](f: FunK[F, G]): G[A] = this.tailRecM {
-    case Freer.Pure(a)          => a.asRight.pure[G]
-    case bind: Freer.Bind[F, A] => f(bind.head).map(a => bind.cont(a).asLeft)
+    case Freer.Pure(a)               => a.asRight.pure[G]
+    case bind: Freer.Bind[F, pin, A] => f(bind.head).map(a => bind.cont(a).asLeft)
   }
   def mapK[G[_]](f: FunK[F, G]): Freer[G, A]
 }
 
 object Freer {
   def pure[A](a: A): Freer[Nothing, A] = Pure(a)
-  def lift[F[_], A](fa: F[A]): Freer[F, A] = new Bind[F, A] {
-    type Pin = A
+  def lift[F[_], A](fa: F[A]): Freer[F, A] = new Bind[F, A, A] {
     def head: F[A]              = fa
     def cont(a: A): Freer[F, A] = pure(a)
   }
@@ -31,20 +30,17 @@ object Freer {
     def mapK[G[_]](f: FunK[Nothing, G]): Freer[G, A] = this
   }
 
-  trait Bind[+F[_], A] extends Freer[F, A] { self =>
-    type Pin
+  trait Bind[+F[_], Pin, A] extends Freer[F, A] { self =>
     def head: F[Pin]
     def cont(a: Pin): Freer[F, A]
 
-    def flatMap[G[x] >: F[x], B](f: A => Freer[G, B]): Bind[G, B] = new Bind[G, B] {
-      type Pin = self.Pin
-      def head                                                               = self.head
-      def cont(a: Pin)                                                       = self.cont(a).flatMap[G, B](f)
-      override def flatMap[H[x] >: G[x], C](g: B => Freer[H, C]): Bind[H, C] = self.flatMap(a => f(a).flatMap(g))
+    def flatMap[G[x] >: F[x], B](f: A => Freer[G, B]): Bind[G, Pin, B] = new Bind[G, Pin, B] {
+      def head                                                                    = self.head
+      def cont(a: Pin)                                                            = self.cont(a).flatMap[G, B](f)
+      override def flatMap[H[x] >: G[x], C](g: B => Freer[H, C]): Bind[H, Pin, C] = self.flatMap(a => f(a).flatMap(g))
     }
 
-    def mapK[G[_]](f: FunK[F, G]): Freer[G, A] = new Bind[G, A] {
-      type Pin = self.Pin
+    def mapK[G[_]](f: FunK[F, G]): Freer[G, A] = new Bind[G, Pin, A] {
       def head: G[Pin]              = f(self.head)
       def cont(a: Pin): Freer[G, A] = self.cont(a).mapK(f)
     }
