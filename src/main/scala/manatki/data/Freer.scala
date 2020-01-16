@@ -10,6 +10,11 @@ sealed trait Freer[+F[_], A] {
     case Freer.Pure(a)               => a.asRight.pure[G]
     case bind: Freer.Bind[F, pin, A] => f(bind.head).map(a => bind.cont(a).asLeft)
   }
+  // fold map for stack safe monads
+  def foldMapL[G[_]: Monad](f: FunK[F, G]): G[A] = this match {
+    case Freer.Pure(a)               => a.pure[G]
+    case bind: Freer.Bind[F, pin, A] => f(bind.head).flatMap(pin => bind.cont(pin).foldMapL(f))
+  }
   def mapK[G[_]](f: FunK[F, G]): Freer[G, A]
 }
 
