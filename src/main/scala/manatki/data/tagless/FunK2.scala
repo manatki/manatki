@@ -1,13 +1,13 @@
 package manatki.data.tagless
 import manatki.data.tagless.FunK2.MakeFunctionK2
 
-trait FunK2[P[_, _], Q[_, _]] {
+trait FunK2[-P[_, _], +Q[_, _]] {
   def apply[A, B](p: P[A, B]): Q[A, B]
 }
 
 object FunK2 {
   def apply[P[_, _], Q[_, _]](maker: MakeFunctionK2[P, Q]): FunK2[P, Q] = maker
-  abstract class MakeFunctionK2[P[_, _], Q[_, _]] extends FunK2[P, Q] {
+  abstract class MakeFunctionK2[-P[_, _], +Q[_, _]] extends FunK2[P, Q] {
     def applyArbitrary(f: P[Arb1, Arb2]): Q[Arb1, Arb2]
 
     def apply[A, B](p: P[A, B]): Q[A, B] =

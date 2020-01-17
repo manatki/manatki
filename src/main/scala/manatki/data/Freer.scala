@@ -1,10 +1,10 @@
 package manatki.data
-import cats.free.Free
 import cats.syntax.either._
-import cats.{Eval, Foldable, Functor, Monad, StackSafeMonad}
+import cats.syntax.foldable._
+import cats.syntax.traverse._
+import cats.{Applicative, Eval, Foldable, Functor, Monad, StackSafeMonad, Traverse}
 import manatki.free.FunK
 import tofu.syntax.monadic._
-import cats.syntax.foldable._
 
 import scala.annotation.tailrec
 
@@ -23,7 +23,7 @@ sealed trait Freer[+F[_], A] {
 
 }
 
-object Freer {
+object Freer extends FreerInstances {
   val unit: Freer[Nothing, Unit] = pure(())
 
   def pure[A](a: A): Freer[Nothing, A] = Pure(a)
@@ -68,6 +68,8 @@ object Freer {
 
   implicit def monadInstance[F[_]]: Monad[Freer[F, *]] = monadInstanceAny.asInstanceOf[MonadInstance[F]]
 
+  implicit def traverseInstance[F[_]: Traverse]: Traverse[Freer[F, *]] = new FreeTraverse
+
   private class MonadInstance[F[_]] extends StackSafeMonad[Freer[F, *]] {
     override def flatMap[A, B](fa: Freer[F, A])(f: A => Freer[F, B]): Freer[F, B] = fa.flatMap(f)
     override def pure[A](x: A): Freer[F, A]                                       = Freer.Pure(x)
@@ -76,12 +78,27 @@ object Freer {
   private val monadInstanceAny: MonadInstance[Any] = new MonadInstance
 }
 
+trait FreerInstances {
+  final implicit def foldableInstance[F[_]: Foldable]: Foldable[Freer[F, *]] = new FreeFoldable
+}
+
 class FreeFoldable[F[_]: Foldable] extends Foldable[Freer[F, *]] {
-  override def foldLeft[A, B](fa: Freer[F, A], b: B)(f: (B, A) => B): B =
-    foldRight[A, Eval[B] => Eval[B]](fa, Eval.now(identity))((f, ef) => )
-  override def foldRight[A, B](fa: Freer[F, A], lb: Eval[B])(f: (A, Eval[B]) => Eval[B]): Eval[B] = fa match {
+  final def foldLeft[A, B](fa: Freer[F, A], b: B)(f: (B, A) => B): B =
+    foldRight[A, Eval[B] => Eval[B]](fa, Eval.now(identity))(
+      (a, ef) => Eval.later(eb => ef.flatMap(u => u(eb.map(b => f(b, a)))))
+    ).value(Eval.now(b)).value
+
+  final def foldRight[A, B](fa: Freer[F, A], lb: Eval[B])(f: (A, Eval[B]) => Eval[B]): Eval[B] = fa match {
     case Freer.Pure(a) => f(a, lb)
     case bind: Freer.Bind[F, pin, A] =>
       Eval.defer(bind.head.foldRight(lb)((pin, lb1) => foldRight(bind.cont(pin), lb1)(f)))
   }
+}
+
+class FreeTraverse[F[_]: Traverse] extends FreeFoldable[F] with Traverse[Freer[F, *]] {
+  final def traverse[G[_]: Applicative, A, B](fa: Freer[F, A])(f: A => G[B]): G[Freer[F, B]] =
+    fa match {
+      case Freer.Pure(a)               => f(a).map(Freer.pure)
+      case bind: Freer.Bind[F, pin, A] => bind.head.traverse(pin => traverse(bind.cont(pin))(f)).map(Freer.roll)
+    }
 }
