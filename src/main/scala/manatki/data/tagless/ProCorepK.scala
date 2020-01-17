@@ -1,6 +1,5 @@
 package manatki.data.tagless
 import cats.arrow.FunctionK
-import cats.data.Nested
 import cats.tagless.FunctorK
 import cats.{Applicative, ~>}
 import manatki.syntax.funK
@@ -8,7 +7,7 @@ import simulacrum.typeclass
 import tofu.higherKind.RepK
 
 @typeclass
-trait ProfunctorK[P[-_[_], +_[_]]] {
+trait ProK[P[-_[_], +_[_]]] {
   def leftMapK[I[_], J[_], O[_]](pio: P[I, O])(fk: J ~> I): P[J, O]
   def rightMapK[I[_], O[_], Q[_]](pio: P[I, O])(fk: O ~> Q): P[I, Q]
 
@@ -17,7 +16,7 @@ trait ProfunctorK[P[-_[_], +_[_]]] {
 }
 
 @typeclass
-trait ProCorepresentableK[P[_[_], _[_]]] extends ProfunctorK[P] {
+trait ProCorepK[P[_[_], _[_]]] extends ProK[P] {
   def tabulateK[I[_], O[_]](hom: RepK[P[I, *[_]], *] ~> O): P[I, O]
 
   override def rightMapK[I[_], O[_], Q[_]](fab: P[I, O])(f: O ~> Q): P[I, Q] =
@@ -30,16 +29,16 @@ trait ProCorepresentableK[P[_[_], _[_]]] extends ProfunctorK[P] {
     }
 }
 
-object ProCorepresentableK {
-  def tabulateK[P[_[_], _[_]], F[_], G[_]](k: RepK[P[F, *[_]], *] ~> G)(implicit P: ProCorepresentableK[P]): P[F, G] =
+object ProCorepK {
+  def tabulateK[P[_[_], _[_]], F[_], G[_]](k: RepK[P[F, *[_]], *] ~> G)(implicit P: ProCorepK[P]): P[F, G] =
     P.tabulateK(k)
 
-  def constructK[P[-_[_], +_[_]]: ProCorepresentableK]: P[Layer1[P, *], Layer1[P, *]] =
+  def constructK[P[-_[_], +_[_]]: ProCorepK]: P[Layer1[P, *], Layer1[P, *]] =
     tabulateK[P, Layer1[P, *], Layer1[P, *]](funK(_(constructK)))
 }
 
 @typeclass
-trait ProTraverseK[P[_[_], _[_]]] extends ProCorepresentableK[P] {
+trait ProTraverseK[P[_[_], _[_]]] extends ProCorepK[P] {
   def proTraverseK[F[_]: Applicative, I[_], O[_]](pio: P[I, O]): P[λ[a => F[I[a]]], λ[a => F[O[a]]]]
 }
 

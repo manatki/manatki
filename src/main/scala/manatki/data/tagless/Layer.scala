@@ -58,9 +58,9 @@ object Layer {
 
     def paraL[A](p: P[(A, Layer[P]), A])(implicit P: ProTraverse[P]): Eval[A] = paraEvalT[P, A](layer, P.protraverse(p))
 
-    def prepro[A](f: FunK2[P, P])(p: P[A, A])(implicit P: Pro[P]): A = layer.unpack(f(P.lmap(p)(_.prepro(f)(p))))
+    def prepro[A](f: FunK2[P, P])(p: P[A, A])(implicit P: LMap[P]): A = layer.unpack(f(P.lmap(p)(_.prepro(f)(p))))
 
-    def preproEval[A](f: FunK2[P, P])(p: P[Eval[A], Eval[A]])(implicit P: Pro[P]): Eval[A] =
+    def preproEval[A](f: FunK2[P, P])(p: P[Eval[A], Eval[A]])(implicit P: LMap[P]): Eval[A] =
       layer.unpack(f(P.lmap(p)(x => Eval.defer(x.preproEval(f)(p)))))
 
     def preproL[A](f: FunK2[P, P])(p: P[A, A])(implicit P: ProTraverse[P]): Eval[A] =
@@ -79,7 +79,7 @@ object Layer {
 
   private def cofreeDist[P[-_, _]](implicit P: ProCorep[P]): PDistr[P, CofreeP[P, *]] = {
     def pdist[A]: P[CofreeP[P, A], CofreeP[P, Rep[P[A, *]]]] =
-      P.tabulate { rep =>
+      P.cotabulate { rep =>
         new CofreeP[P, Rep[P[A, *]]] {
           def value: Rep[P[A, *]] = rep.pmap(_.value)
           def unpack[R](p: P[CofreeP[P, Rep[P[A, *]]], R]): R =
@@ -107,27 +107,27 @@ trait GBuilder[-P[_, _], F[_], A] { self =>
 
 object GBuilder {
   implicit class BuilderUnfoldOpsC[P[-_, _], A](private val builder: Builder[P, A]) extends AnyVal {
-    def unfold(init: A)(implicit P: Pro[P]): Layer[P] =
+    def unfold(init: A)(implicit P: LMap[P]): Layer[P] =
       new Layer[P] {
         def unpack[B](p: P[Layer[P], B]): B =
           builder.continue(init, P.lmap(p)(unfold(_)))
       }
-    def postpro(f: FunK2[P, P])(init: A)(implicit P: Pro[P]): Layer[P] = new Layer[P] {
+    def postpro(f: FunK2[P, P])(init: A)(implicit P: LMap[P]): Layer[P] = new Layer[P] {
       def unpack[B](p: P[Layer[P], B]): B =
         builder.continue(init, f(P.lmap(p)(postpro(f)(_))))
     }
   }
   implicit class BuilderUnfoldOps[P[_, _], A](private val builder: Builder[P, A]) extends AnyVal {
-    def hylo[B](p: P[B, B])(a: A)(implicit P: Pro[P]): B = builder.continue(a, P.lmap(p)(hylo(p)))
+    def hylo[B](p: P[B, B])(a: A)(implicit P: LMap[P]): B = builder.continue(a, P.lmap(p)(hylo(p)))
 
-    def hyloEval[B](p: P[Eval[B], Eval[B]])(a: A)(implicit P: Pro[P]): Eval[B] =
+    def hyloEval[B](p: P[Eval[B], Eval[B]])(a: A)(implicit P: LMap[P]): Eval[B] =
       builder.continue(a, P.lmap(p)(ea => Eval.defer(hyloEval(p)(ea))))
 
     def hyloL[B](p: P[B, B])(a: A)(implicit P: ProTraverse[P]): Eval[B] = hyloEval(P.protraverse(p))(a)
   }
 
   implicit class BuilderApoOps[P[-_, _], A](private val builder: Builder[P, LayerOr[P, A]]) extends AnyVal {
-    def apo(init: A)(implicit P: Pro[P]): Layer[P] =
+    def apo(init: A)(implicit P: LMap[P]): Layer[P] =
       new Layer[P] {
         def unpack[B](p: P[Layer[P], B]): B =
           builder(LayerVal(init), P.lmap(p) {
@@ -142,7 +142,7 @@ object GBuilder {
   }
 
   implicit class GBuilderOpsC[P[-_, _], F[_], A](private val builder: GBuilder[P, F, A]) extends AnyVal {
-    def gunfold(dist: PCodistr[P, F])(init: A)(implicit P: Pro[P], F: Monad[F]): Layer[P] = {
+    def gunfold(dist: PCodistr[P, F])(init: A)(implicit P: LMap[P], F: Monad[F]): Layer[P] = {
       def go(fra: F[Rep[P[F[A], *]]]): Layer[P] =
         Layer[P](p => dist(fra, P.lmap(p)((ffa: F[F[A]]) => go(ffa.flatten.map(a => Rep.pro[P, F[A]](builder(a, _)))))))
 
@@ -150,14 +150,14 @@ object GBuilder {
     }
   }
 
-  private def freeСodist[P[-_, _]](implicit P: Pro[P]): PCodistr[P, FreeP[P, *]] =
+  private def freeСodist[P[-_, _]](implicit P: LMap[P]): PCodistr[P, FreeP[P, *]] =
     new PCodistr[P, FreeP[P, *]] {
       override def apply[A, R](mr: FreeP[P, Rep[P[A, *]]], pr: P[FreeP[P, A], R]): R =
         mr.unpack(P.lmap(pr)(fp => FreeP[P, A](this(fp, _))))(_(P.lmap(pr)(FreeP.pure)))
     }
 
   implicit class BuilderFutuOps[P[-_, _], A](private val builder: GBuilder[P, FreeP[P, *], A]) extends AnyVal {
-    def futu(init: A)(implicit P: Pro[P]): Layer[P] = builder.gunfold(freeСodist[P])(init)
+    def futu(init: A)(implicit P: LMap[P]): Layer[P] = builder.gunfold(freeСodist[P])(init)
   }
 }
 
@@ -207,7 +207,7 @@ object CofreeP {
     def unpack[R](p: P[CofreeP[P, A], R]): R = f.apply(wa.coflatMap(unfoldMap(f)), p)
   }
 
-  implicit def cofreeInstance[P[-_, _]](implicit P: Pro[P]): Comonad[CofreeP[P, *]] =
+  implicit def cofreeInstance[P[-_, _]](implicit P: LMap[P]): Comonad[CofreeP[P, *]] =
     new Comonad[CofreeP[P, *]] {
       def extract[A](x: CofreeP[P, A]): A = x.value
       def coflatMap[A, B](fa: CofreeP[P, A])(f: CofreeP[P, A] => B): CofreeP[P, B] =
@@ -245,7 +245,7 @@ object FreeP {
   }
 
   implicit class FreeMonadOps[P[-_, _], A](private val self: FreeP[P, A]) extends AnyVal {
-    def foldMap[M[+_]: Monad](f: PTrans[P, M])(implicit P: Pro[P]): M[A] =
+    def foldMap[M[+_]: Monad](f: PTrans[P, M])(implicit P: RMap[P]): M[A] =
       self.tailRecM[M, A](_.unpack(P.rmap(f[FreeP[P, A]])(_.map(_.asLeft[A])))(a => a.asRight.pure[M]))
   }
 
@@ -256,7 +256,7 @@ object FreeP {
       applyArbitrary(fk.asInstanceOf[P[FreeP[P, A], Arb]]).asInstanceOf[R]
   }
 
-  implicit def freeMonad[P[-_, _]](implicit P: Pro[P]): Monad[FreeP[P, *]] =
+  implicit def freeMonad[P[-_, _]](implicit P: LMap[P]): Monad[FreeP[P, *]] =
     new StackSafeMonad[FreeP[P, *]] {
       def flatMap[A, B](fa: FreeP[P, A])(f: A => FreeP[P, B]): FreeP[P, B] = new FreeP[P, B] {
         def unpack[R](pf: P[FreeP[P, B], R])(br: B => R): R =

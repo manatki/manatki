@@ -11,7 +11,7 @@ object OptP {
   type OP[-A, -I, +O] = OptP[A, O]
 
   implicit def corepresentable[I]: ProTraverse[OP[I, -*, +*]] = new ProTraverse[OP[I, -*, +*]] {
-    def tabulate[A, B](k: Rep[OptP[I, *]] => B): OptP[I, B] =
+    def cotabulate[A, B](k: Rep[OptP[I, *]] => B): OptP[I, B] =
       new Tab[A, B, OP[I, -*, +*]](k) with Tabulate[I, A, B, OP[I, -*, +*]]
 
     def lmap[A, B, C](fab: OptP[I, B])(f: C => A): OptP[I, B] = fab

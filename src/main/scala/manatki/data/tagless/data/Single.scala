@@ -13,7 +13,7 @@ object Single {
   def apply[A](a: A): Layer[NP[A, -*, +*]] = Layer[NP[A, -*, +*]](_.single(a))
 
   implicit def corepresentable[I]: ProCorep[NP[I, -*, +*]] = new ProCorep[NP[I, -*, +*]] {
-    def tabulate[A, B](k: Rep[Single[I, *]] => B): Single[I, B] =
+    def cotabulate[A, B](k: Rep[Single[I, *]] => B): Single[I, B] =
       new Tab[A, B, NP[I, -*, +*]](k) with Tabulate[I, A, B, NP[I, -*, +*]]
 
     def lmap[A, B, C](fab: Single[I, B])(f: C => A): Single[I, B] = fab

@@ -14,7 +14,7 @@ object NelP {
     }.unfold(a +: as)
 
   implicit def corepresentable[I]: ProTraverse[NelP[I, -*, +*]] = new ProTraverse[NelP[I, -*, +*]] {
-    def tabulate[A, B](k: Rep[NelP[I, A, *]] => B): NelP[I, A, B] =
+    def cotabulate[A, B](k: Rep[NelP[I, A, *]] => B): NelP[I, A, B] =
       new Tab[A, B, NelP[I, -*, +*]](k) with Tabulate[I, A, B, NelP[I, -*, +*]]
 
     def lmap[A, B, C](fab: NelP[I, A, B])(f: C => A): NelP[I, C, B] =

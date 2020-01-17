@@ -19,7 +19,7 @@ object ListP {
     }.unfold(as)
 
   implicit def corepresentable[I]: ProTraverse[ListP[I, -*, +*]] = new ProTraverse[ListP[I, -*, +*]] {
-    def tabulate[A, B](k: Rep[ListP[I, A, *]] => B): ListP[I, A, B] =
+    def cotabulate[A, B](k: Rep[ListP[I, A, *]] => B): ListP[I, A, B] =
       new Tab[A, B, ListP[I, -*, +*]](k) with Tabulate[I, A, B, ListP[I, -*, +*]]
 
     def lmap[A, B, C](fab: ListP[I, A, B])(f: C => A): ListP[I, C, B] =

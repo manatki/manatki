@@ -27,7 +27,7 @@ object Nil extends Layer[λ[(`-a`, `+b`) => Nil[b]]] {
   }
 
   implicit val corepresentable: ProTraverse[NP] = new ProTraverse[NP] {
-    def tabulate[A, B](k: Rep[Nil] => B): Nil[B] =
+    def cotabulate[A, B](k: Rep[Nil] => B): Nil[B] =
       new Tab[A, B, NP](k) with Tabulate[A, B, NP]
 
     def lmap[A, B, C](fab: Nil[B])(f: C => A): Nil[B] = fab

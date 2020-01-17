@@ -25,7 +25,7 @@ object Cons {
   }
 
   implicit def corepresentable[I]: ProTraverse[Cons[I, -*, +*]] = new ProTraverse[Cons[I, -*, +*]] {
-    def tabulate[A, B](k: Rep[Cons[I, A, *]] => B): Cons[I, A, B] =
+    def cotabulate[A, B](k: Rep[Cons[I, A, *]] => B): Cons[I, A, B] =
       new Tab[A, B, Cons[I, -*, +*]](k) with Tabulate[I, A, B, Cons[I, -*, +*]]
 
     def lmap[A, B, C](fab: Cons[I, A, B])(f: C => A): Cons[I, C, B] =
