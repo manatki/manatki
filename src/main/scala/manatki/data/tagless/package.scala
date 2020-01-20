@@ -6,4 +6,7 @@ package object tagless {
   type PDistr[P[-_, _], F[_]]   = PDistr.T[P, F]
 
   type Builder[-P[_, _], A] = GBuilder[P, Id, A]
+
+  type UnitF[A] = Unit
+  type HFunction[F[_], G[_], A] = F[A] => G[A]
 }
