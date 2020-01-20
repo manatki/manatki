@@ -1,11 +1,7 @@
 package manatki.data.tagless
-import cats.arrow.FunctionK
 import cats.{Eval, Functor, Id, ~>}
 import manatki.data.day.{Day, DayClosure, FunctionD2}
-import manatki.free.FunK
-import manatki.syntax.funK
 import simulacrum.typeclass
-import tofu.higherKind.Function2K
 import tofu.syntax.monadic._
 
 @typeclass
@@ -13,6 +9,7 @@ trait HFunctor[U[_[_], _]] {
   implicit def functor[F[_]: Functor]: Functor[U[F, *]]
   def hmap[F[_]: Functor, G[_]: Functor, A](ufa: U[F, A])(fk: F ~> G): U[G, A]
 }
+
 @typeclass
 trait DSemigroupal[U[_[_], _]] extends HFunctor[U] {
   def dmap2[F[_]: Functor, G[_]: Functor, H[_]: Functor, A, X, Y](fx: U[F, X], gy: U[G, Y])(xya: (X, Y) => Eval[A])(
@@ -34,6 +31,7 @@ trait DSemigroupal[U[_[_], _]] extends HFunctor[U] {
 @typeclass trait HPoint[U[_[_], _]] {
   def hpoint[A](a: A): U[Id, A]
 }
+
 @typeclass trait HPure[U[_[_], _]] extends HPoint[U] {
   def hpure[F[_]: Functor, A](fa: F[A]): U[F, A]
   override def hpoint[A](a: A): U[Id, A] = hpure[Id, A](a)
@@ -43,6 +41,7 @@ trait DSemigroupal[U[_[_], _]] extends HFunctor[U] {
   override def hmap[F[_]: Functor, G[_]: Functor, A](ufa: U[F, A])(fk: F ~> G): U[G, A] =
     dmap2(ufa, hpoint[Unit](()))((a, _) => Eval.now(a))(FunctionD2[F, Id]((fa, b, f) => fk(fa).map(f(_, b).value)))
 }
+
 @typeclass trait DFlatMap[U[_[_], _]] extends DSemigroupal[U] {
   def dflatten[F[_]: Functor, A](uuf: U[U[F, *], A]): U[F, A] =
     dflatMap(uuf, DayClosure.id[U[F, *], Unit](()))((a, _) => Eval.now(a))
