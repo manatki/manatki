@@ -31,17 +31,18 @@ trait DSemigroupal[U[_[_], _]] extends HFunctor[U] {
     dmap2(hf, uf)((f, a) => Eval.later(f(a)))(FunctionD2[DayClosure[F, G, *], F]((fgx, fx, f) => fgx(fx)(f)))
 }
 
-@typeclass trait HPure[U[_[_], _]] {
+@typeclass trait HPoint[U[_[_], _]] {
+  def hpoint[A](a: A): U[Id, A]
+}
+@typeclass trait HPure[U[_[_], _]] extends HPoint[U] {
   def hpure[F[_]: Functor, A](fa: F[A]): U[F, A]
-  def hpoint[A](a: A): U[Id, A] = hpure[Id, A](a)
+  override def hpoint[A](a: A): U[Id, A] = hpure[Id, A](a)
 }
 
-@typeclass trait DMonoidal[U[_[_], _]] extends DSemigroupal[U] with HPure[U] {
+@typeclass trait DMonoidal[U[_[_], _]] extends DSemigroupal[U] with HPoint[U] {
   override def hmap[F[_]: Functor, G[_]: Functor, A](ufa: U[F, A])(fk: F ~> G): U[G, A] =
     dmap2(ufa, hpoint[Unit](()))((a, _) => Eval.now(a))(FunctionD2[F, Id]((fa, b, f) => fk(fa).map(f(_, b).value)))
-
 }
-
 @typeclass trait DFlatMap[U[_[_], _]] extends DSemigroupal[U] {
   def dflatten[F[_]: Functor, A](uuf: U[U[F, *], A]): U[F, A] =
     dflatMap(uuf, DayClosure.id[U[F, *], Unit](()))((a, _) => Eval.now(a))
@@ -51,7 +52,7 @@ trait DSemigroupal[U[_[_], _]] extends HFunctor[U] {
   ): U[G, C]
 }
 
-@typeclass trait DMonad[U[_[_], _]] extends DFlatMap[U] with DMonoidal[U] {
+@typeclass trait DMonad[U[_[_], _]] extends DFlatMap[U] with DMonoidal[U] with HPure[U] {
   override def dmap2[F[_]: Functor, G[_]: Functor, H[_]: Functor, A, X, Y](ufx: U[F, X], ugy: U[G, Y])(
       xya: (X, Y) => Eval[A]
   )(fgh: FunctionD2[F, G, H]): U[H, A] =
