@@ -14,15 +14,16 @@ trait Day[F[_], G[_], A] {
   type Y
   def fx: F[X]
   def gy: G[Y]
-  def comb: (X, Y) => Eval[A]
+  def run(x: X, y: Y): Eval[A]
+  def comb: (X, Y) => Eval[A] = run
   def mapKFirst[H[_]](fk: F ~> H): Day[H, G, A]
   def mapKSecond[H[_]](fk: G ~> H): Day[F, H, A]
   def map[B](f: A => B): Day[F, G, B]                 = Day[F, G, X, Y, B](fx, gy)((x, y) => comb(x, y).map(f))
   def fold[H[_]: Apply](fk: F ~> H, gk: G ~> H): H[A] = fk(fx).map2(gk(gy))(comb).map(_.value)
   def swap: Day[G, F, A]                              = Day(gy, fx)((y, x) => comb(x, y))
 
-  def projectL[B](implicit F: Functor[F], G: Comonad[G]): F[A] = fx.map(comb(_, gy.extract).value)
-  def projectR[B](implicit F: Comonad[F], G: Functor[G]): G[A] = gy.map(comb(fx.extract, _).value)
+  def projectL[B](implicit F: Functor[F], G: Comonad[G]): F[A] = fx.map(run(_, gy.extract).value)
+  def projectR[B](implicit F: Comonad[F], G: Functor[G]): G[A] = gy.map(run(fx.extract, _).value)
 }
 
 object Day extends DayInstances1 {
@@ -41,17 +42,20 @@ object Day extends DayInstances1 {
   }
 
   def zip[F[_], G[_], A](dfg: Day[Cofree[F, *], Cofree[G, *], A]): Cofree[Day[F, G, *], A] =
-    Cofree(dfg.comb(dfg.fx.head, dfg.gy.head).value,
-           (dfg.fx.tail, dfg.gy.tail).mapN((fx, gy) => Day(fx, gy)((x, y) => Eval.later(zip(Day(x, y)(dfg.comb))))))
-
+    Cofree(
+      dfg.comb(dfg.fx.head, dfg.gy.head).value,
+      (dfg.fx.tail, dfg.gy.tail).mapN((fx, gy) => Day(fx, gy)((x, y) => Eval.later(zip(Day(x, y)(dfg.comb)))))
+    )
 
   def zipK[F[_], G[_]]: Day[Cofree[F, *], Cofree[G, *], *] ~> Cofree[Day[F, G, *], *] =
     functionK[Day[Cofree[F, *], Cofree[G, *], *]](zip)
 
-  private class Impl[F[_], G[_], XX, YY, A](val fx: F[XX], val gy: G[YY], val comb: (XX, YY) => Eval[A])
+  private class Impl[F[_], G[_], XX, YY, A](val fx: F[XX], val gy: G[YY], override val comb: (XX, YY) => Eval[A])
       extends Day[F, G, A] {
     type X = XX
     type Y = YY
+
+    override def run(x: XX, y: YY): Eval[A] = comb(x, y)
     override def mapKFirst[H[_]](fk: F ~> H): Day[H, G, A]  = Day(fk(fx), gy)(comb)
     override def mapKSecond[H[_]](fk: G ~> H): Day[F, H, A] = Day(fx, fk(gy))(comb)
   }
@@ -64,7 +68,7 @@ object Day extends DayInstances1 {
     override def ap[A, B](ff: Day[F, G, A => B])(fa: Day[F, G, A]): Day[F, G, B] = map2(ff, fa)(_(_))
     override def map2[A, B, Z](fa: Day[F, G, A], fb: Day[F, G, B])(f: (A, B) => Z): Day[F, G, Z] =
       Day[F, G, (fa.X, fb.X), (fa.Y, fb.Y), Z](fa.fx.product(fb.fx), fa.gy.product(fb.gy)) {
-        case ((ax, bx), (ay, by)) => fa.comb(ax, ay).map2(fb.comb(bx, by))(f)
+        case ((ax, bx), (ay, by)) => fa.run(ax, ay).map2(fb.run(bx, by))(f)
       }
   }
 
@@ -81,7 +85,7 @@ object Day extends DayInstances1 {
   }
 
   class DayComonad[F[_]: Comonad, G[_]: Comonad] extends DayCoflatMap[F, G] with Comonad[Day[F, G, *]] {
-    override def extract[A](x: Day[F, G, A]): A = x.comb(x.fx.extract, x.gy.extract).value
+    override def extract[A](x: Day[F, G, A]): A = x.run(x.fx.extract, x.gy.extract).value
   }
 }
 
