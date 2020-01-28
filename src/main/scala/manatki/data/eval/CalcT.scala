@@ -1,5 +1,4 @@
 package manatki.data.eval
-package stage
 
 import cats.data.{IndexedState, State}
 import cats.effect.ExitCase
@@ -9,7 +8,7 @@ import manatki.data.eval.NothingT
 import manatki.free.FunK
 import tofu.optics.{Contains, PContains}
 //import tofu.syntax.monadic._
-import CalcMSpecials._
+import CalcTSpecials._
 
 import scala.annotation.tailrec
 
@@ -295,7 +294,7 @@ object CalcT {
   }
 }
 
-object CalcMSpecials {
+object CalcTSpecials {
   sealed trait SinkStep[+F[+_], -XO, -XE, -XA, -R, S, +O, +E, +A] {
     def mapK[G[+_]](f: FunK[F, G]): SinkStep[G, XO, XE, XA, R, S, O, E, A]
   }
