@@ -13,7 +13,7 @@ import scala.annotation.tailrec
 
 sealed trait CalcM[+F[+_], -R, -S1, +S2, +E, +A] {
   def narrowRead[R1 <: R]: CalcM[F, R1, S1, S2, E, A] = this
-  def mapK[G[+_]: Functor](fk: FunK[F, G]): CalcM[G, R, S1, S2, E, A]
+  def mapK[G[+_]](fk: FunK[F, G]): CalcM[G, R, S1, S2, E, A]
 }
 
 object CalcM {
@@ -32,7 +32,7 @@ object CalcM {
 
   sealed trait CalcMRes[-R, -S1, +S2, +E, +A] extends CalcM[Nothing, R, S1, S2, E, A] {
     def submit[X](submit: Submit[R, S1, S2, E, A, X]): X
-    def mapK[G[+_]: Functor](fk: FunK[Nothing, G]): CalcM[G, R, S1, S2, E, A] = this
+    def mapK[G[+_]](fk: FunK[Nothing, G]): CalcM[G, R, S1, S2, E, A] = this
   }
   final case class Pure[S, +A](a: A) extends CalcMRes[Any, S, S, Nothing, A] {
     def submit[X](submit: Submit[Any, S, S, Nothing, A, X]): X = submit.success(submit.state, a)
@@ -51,7 +51,7 @@ object CalcM {
   }
   final case class Defer[+F[+_], -R, -S1, +S2, +E, +A](runStep: () => CalcM[F, R, S1, S2, E, A])
       extends CalcM[F, R, S1, S2, E, A] {
-    def mapK[G[+_]: Functor](fk: FunK[F, G]): CalcM[G, R, S1, S2, E, A] = Defer(() => runStep().mapK(fk))
+    def mapK[G[+_]](fk: FunK[F, G]): CalcM[G, R, S1, S2, E, A] = Defer(() => runStep().mapK(fk))
   }
 
   sealed trait ProvideM[+F[+_], R, -S1, +S2, +E, +A] extends CalcM[F, R, S1, S2, E, A] {
@@ -64,13 +64,13 @@ object CalcM {
   final case class Provide[+F[+_], R, -S1, +S2, +E, +A](r: R, inner: CalcM[F, R, S1, S2, E, A])
       extends ProvideM[F, Any, S1, S2, E, A] {
     type R1 = R
-    def any                                                               = Is.refl
-    def mapK[G[+_]: Functor](fk: FunK[F, G]): CalcM[G, Any, S1, S2, E, A] = Provide(r, inner.mapK(fk))
+    def any                                                      = Is.refl
+    def mapK[G[+_]](fk: FunK[F, G]): CalcM[G, Any, S1, S2, E, A] = Provide(r, inner.mapK(fk))
   }
 
-  final case class Sub[+F[+_], -R, -S1, +S2, +E, +A](fc: F[CalcM[F, R, S1, S2, E, A]])
+  final case class Sub[+F[+_], -R, -S1, +S2, +E, M, +A](fm: F[M], k: M => CalcM[F, R, S1, S2, E, A])
       extends CalcM[F, R, S1, S2, E, A] {
-    def mapK[G[+_]: Functor](fk: FunK[F, G]): CalcM[G, R, S1, S2, E, A] = Sub(fk(fc).map(_.mapK(fk)))
+    def mapK[G[+_]](fk: FunK[F, G]): CalcM[G, R, S1, S2, E, A] = Sub[G, R, S1, S2, E, M, A](fk(fm), m => k(m).mapK(fk))
   }
 
   final case class Bind[+F[+_], R, S1, S2, S3, E1, E2, A, B](
@@ -81,7 +81,7 @@ object CalcM {
     type MidErr   = E1
     type MidVal   = A
 
-    def mapK[G[+_]: Functor](fk: FunK[F, G]): CalcM[G, R, S1, S3, E2, B] =
+    def mapK[G[+_]](fk: FunK[F, G]): CalcM[G, R, S1, S3, E2, B] =
       Bind(
         src.mapK(fk),
         new Continue[A, E1, CalcM[G, R, S2, S3, E2, B]] {
@@ -98,8 +98,8 @@ object CalcM {
     final def runTailRec(r: R, init: S1)(implicit F: Monad[F]): F[(S2, Either[E, A])] =
       F.tailRecM(calc.provideSet(r, init)) { c =>
         c.step((), ()) match {
-          case now: StepResult.Now[S2, E, A]            => F.pure(Right((now.state, now.result)))
-          case wrap: StepResult.Wrap[F, r, s, S2, E, A] => F.map(wrap.provided(F))(Left(_))
+          case now: StepResult.Now[S2, E, A]               => F.pure(Right((now.state, now.result)))
+          case wrap: StepResult.Wrap[F, r, s, S2, E, m, A] => F.map(wrap.provided(F))(Left(_))
         }
       }
 
@@ -145,9 +145,9 @@ object CalcM {
   implicit class CalcPureOps[R, S1, S2, E, A](private val calc: CalcM[Nothing, R, S1, S2, E, A]) extends AnyVal {
     final def run(r: R, init: S1): (S2, Either[E, A]) =
       calc.step(r, init) match {
-        case StepResult.Wrap(_, _, n) => n: Nothing
-        case StepResult.Error(s, err) => (s, Left(err))
-        case StepResult.Ok(s, a)      => (s, Right(a))
+        case StepResult.Wrap(_, _, fm, _) => fm: Nothing
+        case StepResult.Error(s, err)     => (s, Left(err))
+        case StepResult.Ok(s, a)          => (s, Right(a))
       }
   }
 
@@ -155,9 +155,9 @@ object CalcM {
       extends AnyVal {
     final def runSuccess(r: R, init: S1): (S2, A) =
       calc.step(r, init) match {
-        case StepResult.Wrap(_, _, n) => n: Nothing
-        case StepResult.Error(_, err) => err
-        case StepResult.Ok(s, a)      => (s, a)
+        case StepResult.Wrap(_, _, fm, _) => fm: Nothing
+        case StepResult.Error(_, err)     => err
+        case StepResult.Ok(s, a)          => (s, a)
       }
   }
 
@@ -188,9 +188,9 @@ object CalcM {
           def success(s: S2, a: A) = StepResult.Ok(s, a)
           def error(s: S2, err: E) = StepResult.Error(s, err)
         })
-      case d: Defer[F, R, S1, S2, E, A]   => step(d.runStep(), r, init)
-      case sub: Sub[F, R, S1, S2, E, A]   => StepResult.Wrap(r, init, sub.fc)
-      case p: Provide[F, r, S1, S2, E, A] => step[F, r, S1, S2, E, A](p.inner, p.r, init)
+      case d: Defer[F, R, S1, S2, E, A]    => step(d.runStep(), r, init)
+      case sub: Sub[F, R, S1, S2, E, m, A] => StepResult.Wrap(r, init, sub.fm, sub.k)
+      case p: Provide[F, r, S1, S2, E, A]  => step[F, r, S1, S2, E, A](p.inner, p.r, init)
       case c1: Bind[F, R, S1, s1, S2, e1, E, a1, A] =>
         c1.src match {
           case res: CalcMRes[R, S1, c1.MidState, e1, a1] =>
@@ -203,8 +203,8 @@ object CalcM {
               )
             step[F, R, s1, S2, E, A](next, r, sm)
           case d: Defer[F, R, S1, _, _, _] => step(d.runStep().bind(c1.continue), r, init)
-          case sub: Sub[F, R, S1, _, _, _] =>
-            StepResult.Wrap[F, R, S1, S2, E, A](r, init, F.map(sub.fc)(_.bind(c1.continue)))
+          case sub: Sub[F, R, S1, _, _, m, _] =>
+            StepResult.Wrap[F, R, S1, S2, E, m, A](r, init, sub.fm, m => sub.k(m).bind(c1.continue))
           case p: ProvideM[F, R, S1, _, _, _] =>
             val kcont = p.any.substitute[λ[r => Continue[a1, e1, CalcM[F, r, s1, S2, E, A]]]](c1.continue)
 
@@ -294,9 +294,14 @@ object CalcMSpecials {
 
     final case class Ok[+S, +A](state: S, value: A)    extends Now[S, Nothing, A]
     final case class Error[+S, +E](state: S, error: E) extends Now[S, E, Nothing]
-    final case class Wrap[F[+_], R, S1, +S2, +E, +A](input: R, state: S1, inner: F[CalcM[F, R, S1, S2, E, A]])
-        extends StepResult[F, S2, E, A] {
-      def provided(implicit F: Functor[F]): F[CalcM[F, Any, Any, S2, E, A]] = F.map(inner)(_.provideSet(input, state))
+    final case class Wrap[F[+_], R, S1, +S2, +E, M, +A](
+        input: R,
+        state: S1,
+        inner: F[M],
+        k: M => CalcM[F, R, S1, S2, E, A]
+    ) extends StepResult[F, S2, E, A] {
+      def provided(implicit F: Functor[F]): F[CalcM[F, Any, Any, S2, E, A]] =
+        F.map(inner)(m => k(m).provideSet(input, state))
     }
   }
 
