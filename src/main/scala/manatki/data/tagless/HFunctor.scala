@@ -1,8 +1,11 @@
 package manatki.data.tagless
+import cats.arrow.FunctionK
 import cats.free.Free
 import cats.{Eval, Functor, Id, ~>}
 import manatki.data.day.{Day, DayClosure, FunctionD2}
 import simulacrum.typeclass
+import tofu.syntax.functionK
+import tofu.syntax.functionK.funK
 import tofu.syntax.monadic._
 
 @typeclass
@@ -35,6 +38,9 @@ trait DSemigroupal[U[_[_], _]] extends HFunctor[U] {
 
 @typeclass trait HPure[U[_[_], _]] extends HPoint[U] {
   def hpure[F[_]: Functor, A](fa: F[A]): U[F, A]
+
+  def hpuref[F[_]: Functor, A]: F ~> U[F, *] = funK(hpure(_))
+
   override def hpoint[A](a: A): U[Id, A] = hpure[Id, A](a)
 }
 
@@ -42,8 +48,29 @@ trait DSemigroupal[U[_[_], _]] extends HFunctor[U] {
   override def hmap[F[_]: Functor, G[_]: Functor, A](ufa: U[F, A])(fk: F ~> G): U[G, A] =
     dmap2(ufa, hpoint[Unit](()))((a, _) => Eval.now(a))(FunctionD2[F, Id]((fa, b, f) => fk(fa).map(f(_, b).value)))
 }
+@typeclass trait DFlatMap[U[_[_], _]] extends HFunctor[U] {
+  def dflatten[F[_]: Functor, A](uuf: U[U[F, *], A]): U[F, A] = dflatMap(uuf)(FunctionK.id)
 
-@typeclass trait DFlatMap[U[_[_], _]] extends DSemigroupal[U] {
+  def dflatMap[F[_]: Functor, G[_]: Functor, A](tfa: U[F, A])(t: F ~> U[G, *]): U[G, A]
+}
+
+@typeclass trait DMonad[U[_[_], _]] extends DFlatMap[U] with HPure[U] {
+  override def hmap[F[_]: Functor, G[_]: Functor, A](ufa: U[F, A])(fk: F ~> G): U[G, A] =
+    dflatMap(ufa)(funK(fx => hpure(fk(fx))))
+}
+
+object DMonad {
+  implicit val freeMonadInstance: DMonad[Free] = new DMonad[Free] {
+    def hpure[F[_]: Functor, A](fa: F[A]): Free[F, A] = Free.liftF(fa)
+
+    implicit def functor[F[_]: Functor]: Functor[Free[F, *]] = implicitly
+
+    def dflatMap[F[_]: Functor, G[_]: Functor, A](tfa: Free[F, A])(t: F ~> Free[G, *]): Free[G, A] = tfa.foldMap(t)
+  }
+}
+
+// WHAT IS IT
+@typeclass trait ХFlatMap[U[_[_], _]] extends DSemigroupal[U] {
   def dflatten[F[_]: Functor, A](uuf: U[U[F, *], A]): U[F, A] =
     dflatMap(uuf, DayClosure.id[U[F, *], Unit](()))((a, _) => Eval.now(a))
 
@@ -52,7 +79,8 @@ trait DSemigroupal[U[_[_], _]] extends HFunctor[U] {
   ): U[G, C]
 }
 
-@typeclass trait DMonad[U[_[_], _]] extends DFlatMap[U] with DMonoidal[U] with HPure[U] {
+//WHAT IS IT?????
+@typeclass trait ХMonad[U[_[_], _]] extends ХFlatMap[U] with DMonoidal[U] with HPure[U] {
   override def dmap2[F[_]: Functor, G[_]: Functor, H[_]: Functor, A, X, Y](ufx: U[F, X], ugy: U[G, Y])(
       xya: (X, Y) => Eval[A]
   )(fgh: FunctionD2[F, G, H]): U[H, A] =
@@ -69,16 +97,4 @@ trait DSemigroupal[U[_[_], _]] extends HFunctor[U] {
     )(xya)
 }
 
-object DMonad {
-  implicit val freeMonadInstance: DMonad[Free] = new DMonad[Free] {
-    def hpure[F[_]: Functor, A](fa: F[A]): Free[F, A] = Free.liftF(fa)
-    def dflatMap[F[_]: Functor, G[_]: Functor, A, B, C](fa: Free[F, A], k: DayClosure[F, Free[G, *], B])(
-        f: (A, B) => Eval[C]
-    ): Free[G, C] =
-      fa.fold[Free[G, C]](
-        a => f(a, ??? : B).value.pure[Free[G, *]],
-        ff => k(ff)((b: B, fr) => Eval.now(dflatMap(fr, k)(f))).flatten
-      )
-    implicit def functor[F[_]: Functor]: Functor[Free[F, *]] = implicitly
-  }
-}
+object ХMonad {}
