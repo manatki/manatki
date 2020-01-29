@@ -48,19 +48,19 @@ trait DSemigroupal[U[_[_], _]] extends HFunctor[U] {
   override def hmap[F[_]: Functor, G[_]: Functor, A](ufa: U[F, A])(fk: F ~> G): U[G, A] =
     dmap2(ufa, hpoint[Unit](()))((a, _) => Eval.now(a))(FunctionD2[F, Id]((fa, b, f) => fk(fa).map(f(_, b).value)))
 }
-@typeclass trait DFlatMap[U[_[_], _]] extends HFunctor[U] {
+@typeclass trait HFlatMap[U[_[_], _]] extends HFunctor[U] {
   def dflatten[F[_]: Functor, A](uuf: U[U[F, *], A]): U[F, A] = dflatMap(uuf)(FunctionK.id)
 
   def dflatMap[F[_]: Functor, G[_]: Functor, A](tfa: U[F, A])(t: F ~> U[G, *]): U[G, A]
 }
 
-@typeclass trait DMonad[U[_[_], _]] extends DFlatMap[U] with HPure[U] {
+@typeclass trait HMonad[U[_[_], _]] extends HFlatMap[U] with HPure[U] {
   override def hmap[F[_]: Functor, G[_]: Functor, A](ufa: U[F, A])(fk: F ~> G): U[G, A] =
     dflatMap(ufa)(funK(fx => hpure(fk(fx))))
 }
 
-object DMonad {
-  implicit val freeMonadInstance: DMonad[Free] = new DMonad[Free] {
+object HMonad {
+  implicit val freeMonadInstance: HMonad[Free] = new HMonad[Free] {
     def hpure[F[_]: Functor, A](fa: F[A]): Free[F, A] = Free.liftF(fa)
 
     implicit def functor[F[_]: Functor]: Functor[Free[F, *]] = implicitly
@@ -70,7 +70,7 @@ object DMonad {
 }
 
 // WHAT IS IT
-@typeclass trait ХFlatMap[U[_[_], _]] extends DSemigroupal[U] {
+@typeclass trait DFlatMap[U[_[_], _]] extends DSemigroupal[U] {
   def dflatten[F[_]: Functor, A](uuf: U[U[F, *], A]): U[F, A] =
     dflatMap(uuf, DayClosure.id[U[F, *], Unit](()))((a, _) => Eval.now(a))
 
@@ -80,7 +80,7 @@ object DMonad {
 }
 
 //WHAT IS IT?????
-@typeclass trait ХMonad[U[_[_], _]] extends ХFlatMap[U] with DMonoidal[U] with HPure[U] {
+@typeclass trait DMonad[U[_[_], _]] extends DFlatMap[U] with DMonoidal[U] with HPure[U] {
   override def dmap2[F[_]: Functor, G[_]: Functor, H[_]: Functor, A, X, Y](ufx: U[F, X], ugy: U[G, Y])(
       xya: (X, Y) => Eval[A]
   )(fgh: FunctionD2[F, G, H]): U[H, A] =
@@ -97,4 +97,3 @@ object DMonad {
     )(xya)
 }
 
-object ХMonad {}
