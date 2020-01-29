@@ -3,11 +3,8 @@ package manatki.data.eval
 import cats.data.{IndexedState, State}
 import cats.effect.ExitCase
 import cats.evidence.Is
-import cats.{Functor, Monad, MonadError, Monoid, StackSafeMonad, ~>}
-import manatki.data.eval.NothingT
+import cats.{Functor, Monad, MonadError, Monoid, StackSafeMonad}
 import manatki.free.FunK
-import tofu.optics.{Contains, PContains}
-//import tofu.syntax.monadic._
 import CalcTSpecials._
 
 import scala.annotation.tailrec

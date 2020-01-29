@@ -1,4 +1,5 @@
 package manatki.data.tagless
+import cats.free.Free
 import cats.{Eval, Functor, Id, ~>}
 import manatki.data.day.{Day, DayClosure, FunctionD2}
 import simulacrum.typeclass
@@ -66,4 +67,18 @@ trait DSemigroupal[U[_[_], _]] extends HFunctor[U] {
 
       }
     )(xya)
+}
+
+object DMonad {
+  implicit val freeMonadInstance: DMonad[Free] = new DMonad[Free] {
+    def hpure[F[_]: Functor, A](fa: F[A]): Free[F, A] = Free.liftF(fa)
+    def dflatMap[F[_]: Functor, G[_]: Functor, A, B, C](fa: Free[F, A], k: DayClosure[F, Free[G, *], B])(
+        f: (A, B) => Eval[C]
+    ): Free[G, C] =
+      fa.fold[Free[G, C]](
+        a => f(a, ??? : B).value.pure[Free[G, *]],
+        ff => k(ff)((b: B, fr) => Eval.now(dflatMap(fr, k)(f))).flatten
+      )
+    implicit def functor[F[_]: Functor]: Functor[Free[F, *]] = implicitly
+  }
 }
