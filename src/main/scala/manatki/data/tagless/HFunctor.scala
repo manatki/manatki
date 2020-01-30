@@ -50,14 +50,14 @@ trait DSemigroupal[U[_[_], _]] extends HFunctor[U] {
 }
 
 @typeclass trait HFlatMap[U[_[_], _]] extends HFunctor[U] {
-  def dflatten[F[_]: Functor, A](uuf: U[U[F, *], A]): U[F, A] = dflatMap(uuf)(FunctionK.id)
+  def hflatten[F[_]: Functor, A](uuf: U[U[F, *], A]): U[F, A] = hflatMap(uuf)(FunctionK.id)
 
-  def dflatMap[F[_]: Functor, G[_]: Functor, A](tfa: U[F, A])(t: F ~> U[G, *]): U[G, A]
+  def hflatMap[F[_]: Functor, G[_]: Functor, A](tfa: U[F, A])(t: F ~> U[G, *]): U[G, A]
 }
 
 @typeclass trait HMonad[U[_[_], _]] extends HFlatMap[U] with HPure[U] {
   override def hmap[F[_]: Functor, G[_]: Functor, A](ufa: U[F, A])(fk: F ~> G): U[G, A] =
-    dflatMap(ufa)(funK(fx => hpure(fk(fx))))
+    hflatMap(ufa)(funK(fx => hpure(fk(fx))))
 }
 
 object HMonad {
@@ -66,22 +66,27 @@ object HMonad {
 
     implicit def functor[F[_]: Functor]: Functor[Free[F, *]] = implicitly
 
-    def dflatMap[F[_]: Functor, G[_]: Functor, A](tfa: Free[F, A])(t: F ~> Free[G, *]): Free[G, A] = tfa.foldMap(t)
+    def hflatMap[F[_]: Functor, G[_]: Functor, A](tfa: Free[F, A])(t: F ~> Free[G, *]): Free[G, A] = tfa.foldMap(t)
   }
 }
 
-@typeclass trait DFlatMap[U[_[_], _]] extends HFunctor[U]{
-  def dflatten[F[_]: Functor, A](uuf: U[U[F, *], A]): U[F, A] =
-    dflatMap(uuf, DayClosure.id[U[F, *], Unit](()))((a, _) => Eval.now(a))
+
+@typeclass trait DFlatMap[U[_[_], _]] extends HFlatMap[U] {
+  override def hflatMap[F[_]: Functor, G[_]: Functor, A](tfa: U[F, A])(t: F ~> U[G, *]): U[G, A] =
+    dflatMap(tfa, DayClosure.fromTrans(t)(()))((a, _) => Eval.now(a))
 
   def dflatMap[F[_]: Functor, G[_]: Functor, A, B, C](fa: U[F, A], k: DayClosure[F, U[G, *], B])(
       f: (A, B) => Eval[C]
   ): U[G, C]
 }
 
-@typeclass trait DMonad[U[_[_], _]] extends DFlatMap[U] with DMonoidal[U] with HPure[U] {
+
+// Tensorial (day) strong monad
+@typeclass trait DMonad[U[_[_], _]] extends DFlatMap[U] with DMonoidal[U] with HMonad[U] {
   def strength[F[_]: Functor, G[_]: Functor, A](d: Day[F, U[G, *], A]): U[Day[F, G, *], A] =
-    dflatMap[G, Day[F, G, *], d.Y, d.X, A](d.gy, DayClosure.mk((gy, f) => hpure(Day(d.fx, gy)(f)) ))((y, x) => d.run(x, y))
+    dflatMap[G, Day[F, G, *], d.Y, d.X, A](d.gy, DayClosure.mk((gy, f) => hpure(Day(d.fx, gy)(f))))(
+      (y, x) => d.run(x, y)
+    )
 
   override def dmap2[F[_]: Functor, G[_]: Functor, H[_]: Functor, A, X, Y](ufx: U[F, X], ugy: U[G, Y])(
       xya: (X, Y) => Eval[A]
