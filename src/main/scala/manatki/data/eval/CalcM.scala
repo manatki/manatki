@@ -1,13 +1,12 @@
 package manatki.data.eval
 
+import CalcMSpecials._
 import cats.data.IndexedState
 import cats.effect.ExitCase
 import cats.evidence.Is
-import cats.{Functor, Monad, MonadError, Monoid, StackSafeMonad, ~>}
+import cats.{Functor, Monad, MonadError, Monoid, StackSafeMonad}
 import manatki.free.FunK
 import tofu.optics.PContains
-import tofu.syntax.monadic._
-import CalcMSpecials._
 
 import scala.annotation.tailrec
 
@@ -68,9 +67,8 @@ object CalcM {
     def mapK[G[+_]](fk: FunK[F, G]): CalcM[G, Any, S1, S2, E, A] = Provide(r, inner.mapK(fk))
   }
 
-  final case class Sub[+F[+_], -R, -S1, +S2, +E, M, +A](fm: F[M], k: M => CalcM[F, R, S1, S2, E, A])
-      extends CalcM[F, R, S1, S2, E, A] {
-    def mapK[G[+_]](fk: FunK[F, G]): CalcM[G, R, S1, S2, E, A] = Sub[G, R, S1, S2, E, M, A](fk(fm), m => k(m).mapK(fk))
+  final case class Sub[+F[+_], S, A](fa: F[A]) extends CalcM[F, Any, S, S, Nothing, A] {
+    def mapK[G[+_]](fk: FunK[F, G]): CalcM[G, Any, S, S, Nothing, A] = Sub(fk(fa))
   }
 
   final case class Bind[+F[+_], R, S1, S2, S3, E1, E2, A, B](
@@ -188,9 +186,9 @@ object CalcM {
           def success(s: S2, a: A) = StepResult.Ok(s, a)
           def error(s: S2, err: E) = StepResult.Error(s, err)
         })
-      case d: Defer[F, R, S1, S2, E, A]    => step(d.runStep(), r, init)
-      case sub: Sub[F, R, S1, S2, E, m, A] => StepResult.Wrap(r, init, sub.fm, sub.k)
-      case p: Provide[F, r, S1, S2, E, A]  => step[F, r, S1, S2, E, A](p.inner, p.r, init)
+      case d: Defer[F, R, S1, S2, E, A]   => step(d.runStep(), r, init)
+      case sub: Sub[F, S1, A]             => StepResult.Wrap(r, init, sub.fa, CalcM.pure[S1, A](_: A))
+      case p: Provide[F, r, S1, S2, E, A] => step[F, r, S1, S2, E, A](p.inner, p.r, init)
       case c1: Bind[F, R, S1, s1, S2, e1, E, a1, A] =>
         c1.src match {
           case res: CalcMRes[R, S1, c1.MidState, e1, a1] =>
@@ -203,8 +201,8 @@ object CalcM {
               )
             step[F, R, s1, S2, E, A](next, r, sm)
           case d: Defer[F, R, S1, _, _, _] => step(d.runStep().bind(c1.continue), r, init)
-          case sub: Sub[F, R, S1, _, _, m, _] =>
-            StepResult.Wrap[F, R, S1, S2, E, m, A](r, init, sub.fm, m => sub.k(m).bind(c1.continue))
+          case sub: Sub[F, S1, c1.MidVal] =>
+            StepResult.Wrap[F, R, S1, S2, E, a1, A](r, init, sub.fa, c1.continue.success)
           case p: ProvideM[F, R, S1, _, _, _] =>
             val kcont = p.any.substitute[λ[r => Continue[a1, e1, CalcM[F, r, s1, S2, E, A]]]](c1.continue)
 

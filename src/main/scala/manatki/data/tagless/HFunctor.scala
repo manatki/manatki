@@ -1,6 +1,6 @@
 package manatki.data.tagless
 import cats.arrow.FunctionK
-import cats.free.Free
+import cats.free.{Cofree, Free}
 import cats.{Eval, Functor, Id, ~>}
 import manatki.data.day.{Day, DayClosure, FunctionD2}
 import simulacrum.typeclass
@@ -96,4 +96,3 @@ object HMonad {
       }
     )(xya)
 }
-
