@@ -48,6 +48,7 @@ trait DSemigroupal[U[_[_], _]] extends HFunctor[U] {
   override def hmap[F[_]: Functor, G[_]: Functor, A](ufa: U[F, A])(fk: F ~> G): U[G, A] =
     dmap2(ufa, hpoint[Unit](()))((a, _) => Eval.now(a))(FunctionD2[F, Id]((fa, b, f) => fk(fa).map(f(_, b).value)))
 }
+
 @typeclass trait HFlatMap[U[_[_], _]] extends HFunctor[U] {
   def dflatten[F[_]: Functor, A](uuf: U[U[F, *], A]): U[F, A] = dflatMap(uuf)(FunctionK.id)
 
@@ -69,8 +70,7 @@ object HMonad {
   }
 }
 
-// WHAT IS IT
-@typeclass trait DFlatMap[U[_[_], _]] extends DSemigroupal[U] {
+@typeclass trait DFlatMap[U[_[_], _]] extends HFunctor[U]{
   def dflatten[F[_]: Functor, A](uuf: U[U[F, *], A]): U[F, A] =
     dflatMap(uuf, DayClosure.id[U[F, *], Unit](()))((a, _) => Eval.now(a))
 
@@ -79,8 +79,10 @@ object HMonad {
   ): U[G, C]
 }
 
-//WHAT IS IT?????
 @typeclass trait DMonad[U[_[_], _]] extends DFlatMap[U] with DMonoidal[U] with HPure[U] {
+  def strength[F[_]: Functor, G[_]: Functor, A](d: Day[F, U[G, *], A]): U[Day[F, G, *], A] =
+    dflatMap[G, Day[F, G, *], d.Y, d.X, A](d.gy, DayClosure.mk((gy, f) => hpure(Day(d.fx, gy)(f)) ))((y, x) => d.run(x, y))
+
   override def dmap2[F[_]: Functor, G[_]: Functor, H[_]: Functor, A, X, Y](ufx: U[F, X], ugy: U[G, Y])(
       xya: (X, Y) => Eval[A]
   )(fgh: FunctionD2[F, G, H]): U[H, A] =
