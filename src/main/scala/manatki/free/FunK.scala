@@ -8,6 +8,8 @@ trait FunK[-F[_], +G[_]] {
 object FunK {
   def apply[F[_]] = new FunKApplied[F](true)
 
+  def id[F[_]]: FunK[F, F] = identityAny.asInstanceOf[FunK[F, F]]
+
   abstract class FunKImpl[X, F[_], G[_]] extends FunK[F, G] {
     def applyA(fa: F[X]): G[X]
 
@@ -18,4 +20,6 @@ object FunK {
     type Arbitrary
     def apply[G[_]](impl: FunKImpl[Arbitrary, F, G]): FunK[F, G] = impl
   }
+
+  private val identityAny: FunK[Any, Any] = apply[Any](x => x)
 }

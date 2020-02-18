@@ -1,9 +1,12 @@
 package manatki.data
+import cats.Id
 
 package object tagless {
-  type Algebra[P[_, _], A] = P[A, A]
+  type PTrans[+P[_, _], F[_]] = PTrans.T[P, F]
+  type PDistr[P[-_, _], F[_]]   = PDistr.T[P, F]
 
-  type Lst[I] = Layer.Fix[ListP[I, *, *]]
+  type Builder[-P[_, _], A] = GBuilder[P, Id, A]
 
-  trait SumT
+  type UnitF[A] = Unit
+  type HFunction[F[_], G[_], A] = F[A] => G[A]
 }

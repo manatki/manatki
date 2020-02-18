@@ -1,8 +1,9 @@
 package manatki.data.day
 
 import cats.implicits._
-import org.scalatest.{FlatSpec, Matchers}
-class FM extends FlatSpec with Matchers {
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
+class FM extends AnyFlatSpec with Matchers {
 
   "FreeMonoidal" should "traverse large list" in {
     List

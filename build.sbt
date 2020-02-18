@@ -19,14 +19,16 @@ libraryDependencies += "org.typelevel"              %% "cats-mtl-core"       % V
 libraryDependencies += "org.typelevel"              %% "cats-tagless-macros" % Version.catsTagless
 libraryDependencies += "ru.tinkoff"                 %% "tofu-core"           % Version.tofu
 libraryDependencies += "ru.tinkoff"                 %% "tofu-concurrent"     % Version.tofu
-libraryDependencies += "ru.tinkoff"                 %% "tofu-optics-core"    % Version.tofu
+libraryDependencies += "ru.tinkoff"                 %% "tofu-optics-macro"   % Version.tofu
 libraryDependencies += "com.github.julien-truffaut" %% "monocle-macro"       % Version.monocle
 libraryDependencies += "com.github.julien-truffaut" %% "monocle-state"       % Version.monocle
+libraryDependencies += "org.typelevel"              %% "simulacrum"          % Version.simulacrum
 
 //libraryDependencies += "ru.tinkoff"                 %% "tofu-optics-interop" % Version.tofu
 //libraryDependencies += "io.higherkindness"          %% "droste-core"         % Version.droste
 
-//libraryDependencies += "io.monix"                   %% "monix"               % Version.monix
+libraryDependencies += "dev.zio" %% "zio"             % Version.zio
+libraryDependencies += "dev.zio" %% "zio-macros-core" % Version.zioMacros
 scalacOptions in ThisBuild ++= List(
   "-Ymacro-annotations",
   "-deprecation",
@@ -44,8 +46,9 @@ lazy val plugins = List(
 )
 
 val testSettings = List(
-  libraryDependencies += "org.scalatest"  %% "scalatest"  % Version.scalaTest  % "test",
-  libraryDependencies += "org.scalacheck" %% "scalacheck" % Version.scalaCheck % "test"
+  libraryDependencies += "org.scalatest"     %% "scalatest"                % Version.scalaTest      % "test",
+  libraryDependencies += "org.scalacheck"    %% "scalacheck"               % Version.scalaCheck     % "test",
+  libraryDependencies += "org.scalatestplus" %% "scalatestplus-scalacheck" % Version.scalaTestCheck % "test",
 )
 
 lazy val akka = project.settings(libraryDependencies ++= akkas)

@@ -1,6 +1,6 @@
-package manatki.data.layer
-import manatki.data.layer.Layer1.FlatMap
-import manatki.data.layer.LayerEffects._
+package manatki.data.tagless
+
+import LayerEffects._
 
 import scala.annotation.tailrec
 

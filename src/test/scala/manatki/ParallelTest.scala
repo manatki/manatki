@@ -1,7 +1,6 @@
 package manatki
 import cats.{ApplicativeError, MonadError, Parallel}
 import cats.data.NonEmptyList
-import org.scalatest.Matchers
 import cats.syntax.parallel._
 import cats.syntax.either._
 import cats.instances.either._
@@ -9,9 +8,10 @@ import cats.instances.parallel._
 import cats.instances.list._
 import cats.syntax.applicative._
 import cats.syntax.monadError._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpec
 
-class ParallelTest extends WordSpec with Matchers {
+class ParallelTest extends AnyWordSpec with Matchers {
 
   type Err = NonEmptyList[String]
   type Res[a] = Either[Err, a]
