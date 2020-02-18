@@ -12,7 +12,7 @@ import cats.syntax.functor._
 import cats.syntax.applicative._
 import cats.syntax.monoid._
 import cats.syntax.foldable._
-import Cont.{reset, resetS, shift, shiftS}
+import ContE.{reset, resetS, shift, shiftS}
 import org.scalatest.FlatSpec
 import Monoid.empty
 import org.scalatest.concurrent.TimeLimitedTests
@@ -28,15 +28,15 @@ class ContSuite extends FlatSpec with TimeLimitedTests {
     _ <- if ((x + y) % 3 == 0) List(()) else List.empty
   } yield (x, y)
 
-  def listEffect[R: Monoid](size: Int, mod: Int): Cont[R, (Int, Int)] =
+  def listEffect[R: Monoid](size: Int, mod: Int): ContE[R, (Int, Int)] =
     for {
-      x <- Cont.range[R](1, size)
-      y <- Cont.range[R](1, x) if (x + y) % mod == 0
+      x <- ContE.range[R](1, size)
+      y <- ContE.range[R](1, x) if (x + y) % mod == 0
     } yield (x, y)
 
-  def listReader[R: Monoid](size: Int): Cont[Int => Eval[R], (Int, Int)] =
+  def listReader[R: Monoid](size: Int): ContE[Int => Eval[R], (Int, Int)] =
     for {
-      mod <- Cont.get[Int, R]
+      mod <- ContE.get[Int, R]
       res <- listEffect[Int => Eval[R]](6, mod)
     } yield res
 
@@ -52,7 +52,7 @@ class ContSuite extends FlatSpec with TimeLimitedTests {
     assert(
       List
         .range(1L, 10001L)
-        .traverse[Cont.State[List[Long], Long, *], Long](x => Cont.state(i => (i + x, i + x)))
+        .traverse[ContE.State[List[Long], Long, *], Long](x => ContE.state(i => (i + x, i + x)))
         .runS(l => i => now(l))(0L)
         .value
         .sum === sumsSum)

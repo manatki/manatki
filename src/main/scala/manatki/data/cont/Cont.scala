@@ -1,108 +1,103 @@
 package manatki.data.cont
 
-import alleycats.std.iterable._
-import cats.Eval.{defer, later, now}
+import Cont.{FlatMap, Pure}
 import cats.mtl.MonadState
-import cats.syntax.flatMap._
-import cats.syntax.foldable._
-import cats.syntax.functor._
-import cats.{Eval, Foldable, Monad, Monoid, StackSafeMonad}
+import cats.{Monad, StackSafeMonad}
+import tofu.Raise
 
-trait Cont[R, +A] {
-  def run(k: Eval[A] => Eval[R]): Eval[R]
-  def runS(k: A => R): R = run(a => later(k(a.value))).value
+sealed trait Cont[R, A] {
+  def map[B](f: A => B): Cont[R, B]              = flatMap(a => Cont.Pure(f(a)))
+  def flatMap[B](f: A => Cont[R, B]): Cont[R, B] = FlatMap[R, A, B](this, f)
+  def run(f: A => R): R                          = map(f).evalue
 }
 
-trait ContS[R, +A] extends Cont[R, A] {
-  def runStrict(k: A => R): R
-  override def runS(k: A => R): R                  = runStrict(k)
-  override def run(k: Eval[A] => Eval[R]): Eval[R] = now(runStrict(a => k(now(a)).value))
-}
+object Cont extends ContoInstances {
+  type State[R, S, A] = Cont[S => Ev[R], A]
+  type Ev[X]          = Cont[X, X]
 
-object Cont {
-  type State[R, S, A] = Cont[S => Eval[R], A]
+  def shift[R, A](cn: Shift[R, A]): Cont[R, A] = cn
 
-  implicit class ResettableOps[R](val c: Cont[R, R]) extends AnyVal {
-    def reset: Eval[R] = Cont.reset(c)
-    def resetS: R      = Cont.resetS(c)
+  case class Pure[R, A](a: A)                                     extends Cont[R, A]
+  case class FlatMap[R, A, B](fa: Cont[R, A], f: A => Cont[R, B]) extends Cont[R, B]
+  trait Shift[R, A] extends Cont[R, A] {
+    def cont(kc: A => Ev[R]): Ev[R]
+  }
+  case class Reset[R, A](c: Ev[A]) extends Cont[R, A]
+
+  implicit class EvOps[A](private val x: Ev[A]) extends AnyVal {
+    def emap[B](f: A => B): Ev[B]         = Reset[B, A](x).map(f)
+    def eflatMap[B](f: A => Ev[B]): Ev[B] = Reset[B, A](x).flatMap(f)
+    def evalue: A                         = loop(x)(ResetStack.id)
   }
 
-  def apply[R, A](f: ContS[R, A]): Cont[R, A] = f
+  import ResetStack._
 
-  def callCCS[R, A, B](c: CallCCS[R, A, B]): Cont[R, A] = c
+  def loop[R, U](conto: Ev[R])(stack: ResetStack[R, U]): U =
+    conto match {
+      case Pure(a) =>
+        stack match {
+          case e: End[R, U]  => e.to(a)
+          case Step(f, tail) => loop(f(a))(tail)
+        }
 
-  def callCC[R, A, B](c: CallCC[R, A, B]): Cont[R, A] = c
+      case u: Shift[R, R] => loop(u.cont(a => Pure(a)))(stack)
+      case Reset(c)       => loop(c)(stack)
+      case fm: FlatMap[R, x, R] =>
+        type X = x
+        fm.fa match {
+          case Pure(b)               => loop(fm.f(b))(stack)
+          case Reset(c)              => loop(c)(Step(fm.f, stack))
+          case fm2: FlatMap[R, y, X] => loop(FlatMap[R, y, R](fm2.fa, y => FlatMap[R, x, R](fm2.f(y), fm.f)))(stack)
+          case u: Shift[R, X]        => loop(u.cont(x => fm.f(x)))(stack)
+        }
+    }
 
-  /** Reader / State like operation */
-  def get[S, R]: State[R, S, S] = Cont(k => s => k(s)(s))
+  def callCC[R, A, B](f: (A => Cont[R, B]) => Cont[R, A]): Cont[R, A] =
+    shift(k => f(a => shift(_ => k(a))).flatMap(k))
 
-  /** state constructor */
+  def contState[S, R, A](f: ((A, S) => Ev[R], S) => Ev[R]): State[R, S, A] =
+    shift(k => Reset(Pure(s => f((a, s) => k(a).eflatMap(_(s)), s))))
+
+  def get[S, R]: State[R, S, S] = contState((k, s) => k(s, s))
   def state[S, R, B](r: S => (B, S)): State[R, S, B] =
-    k => later(s => later(r(s)).flatMap { case (b, s1) => k(now(b)).flatMap(_(s1)) })
+    contState((k, s) => r(s) match { case (b, s1) => k(b, s1) })
 
-  def modify[S, R](f: S => S): State[R, S, Unit] =
-    k => now(s => defer(k(Eval.now(())).flatMap(g => g(f(s)))))
+  def set[S, R, B](s: S): State[R, S, Unit]         = contState((k, _) => k((), s))
+  def update[S, R, B](f: S => S): State[R, S, Unit] = contState((k, s) => k((), f(s)))
 
-  def put[S, R](s: S): State[R, S, Unit] =
-    k => now(_ => defer(k(Eval.now(()))).flatMap(g => g(s)))
+  def raiseError[R, S, A](err: R): State[R, S, A] = contState((_, s) => Pure(err))
 
-  def shift[A, R](c: Shift[R, A]): Cont[R, A]   = c
-  def shiftS[A, R](c: ShiftS[R, A]): Cont[R, A] = c
-
-  def reset[R](c: Cont[R, R]): Eval[R] = c.run(identity)
-  def resetS[R](c: Cont[R, R]): R      = c.runS(identity)
-
-  /** list effect constructor */
-  def foldable[F[_]: Foldable, R: Monoid, A](x: F[A]): Cont[R, A] =
-    f => x.foldMapM(a => f(now(a)))
-
-  def range[R](start: Int, stop: Int)(implicit R: Monoid[R]): Cont[R, Int] =
-    foldable(Iterable.range(start, stop))
-
-  def guardC[R: Monoid](cond: Boolean): Cont[R, Unit] =
-    Cont(f => if (cond) f(()) else Monoid.empty[R])
-
-  implicit class MonoidOps[R, A](val c: Cont[R, A]) extends AnyVal {
-    def withFilter(f: A => Boolean)(implicit R: Monoid[R]): Cont[R, A] =
-      c.flatMap(x => guardC[R](f(x)) as x)
+  class ContoMonad[R] extends StackSafeMonad[Cont[R, *]] {
+    def pure[A](x: A): Cont[R, A]                                     = Pure(x)
+    def flatMap[A, B](fa: Cont[R, A])(f: A => Cont[R, B]): Cont[R, B] = fa.flatMap(f)
   }
 
-  implicit def monadStateInstance[R, S]: MonadState[State[R, S, *], S] = new ContStateMonad
-
-  implicit def monadInstance[R]: Monad[Cont[R, *]] = new ContMonad[R]
-
-  class ContMonad[R] extends StackSafeMonad[Cont[R, *]] {
-    override def flatMap[A, B](fa: Cont[R, A])(f: A => Cont[R, B]): Cont[R, B] =
-      k => now(fa).flatMap(_.run(_.flatMap(a => f(a).run(k))))
-    override def pure[A](x: A): Cont[R, A] = f => f(now(x))
-  }
-
-  abstract class CallCCS[R, A, B] extends ContS[R, A] {
-    def ccs(k: A => Cont[R, B]): Cont[R, A]
-    def runStrict(k: A => R): R = ccs(a => Cont(_ => k(a))).runS(k)
-  }
-
-  abstract class CallCC[R, A, B] extends Cont[R, A] {
-    def cc(k: Eval[A] => Cont[R, B]): Cont[R, A]
-    def run(k: Eval[A] => Eval[R]): Eval[R] = cc(a => _ => k(a)).run(k)
-  }
-
-  abstract class Shift[R, +A] extends Cont[R, A] {
-    def shift(f: Eval[A] => Eval[R]): Cont[R, R]
-    def run(k: Eval[A] => Eval[R]): Eval[R] = defer(reset(shift(k)))
-  }
-
-  abstract class ShiftS[R, +A] extends ContS[R, A] {
-    def shiftS(f: A => R): Cont[R, R]
-    def runStrict(k: A => R): R = resetS(shiftS(k))
-  }
-
-  class ContStateMonad[S, R] extends ContMonad[S => Eval[R]] with MonadState[State[R, S, *], S] {
+  class ContoStateMonad[S, R]
+      extends ContoMonad[S => Cont[R, R]] with MonadState[State[R, S, *], S] with Raise[State[R, S, *], R] {
     val monad: Monad[State[R, S, *]]          = this
     def get: State[R, S, S]                   = Cont.get
-    def set(s: S): State[R, S, Unit]          = Cont.put(s)
-    def inspect[A](f: S => A): State[R, S, A] = Cont.get[S, R].map(f)
-    def modify(f: S => S): State[R, S, Unit]  = Cont.modify(f)
+    def set(s: S): State[R, S, Unit]          = Cont.set(s)
+    def inspect[A](f: S => A): State[R, S, A] = Cont.get.map(f)
+    def modify(f: S => S): State[R, S, Unit]  = Cont.update(f)
+    def raise[A](err: R): State[R, S, A]      = raiseError(err)
   }
 
+}
+trait ContoInstances { self: Cont.type =>
+  implicit def contoStateMonad[S, R]: MonadState[State[R, S, *], S] = new ContoStateMonad
+  implicit def contoMonad[R]: Monad[Cont[R, *]]                     = new ContoMonad
+}
+
+sealed trait ResetStack[A, R]
+
+object ResetStack {
+  private val anyEnd: End[Any, Any] = x => x
+  def id[A]: End[A, A]              = anyEnd.asInstanceOf[End[A, A]]
+
+  trait End[A, R] extends ResetStack[A, R] {
+    def to(a: A): R
+    def apply(a: A): Cont[R, R] = Pure(to(a))
+  }
+
+  final case class Step[A, B, R](head: A => Cont[B, B], tail: ResetStack[B, R]) extends ResetStack[A, R]
 }

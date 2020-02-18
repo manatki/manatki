@@ -60,14 +60,14 @@ object CountWords {
       .value
 
   def countWordsCont(str: String): Map[String, Int] =
-    countWordsM[Cont.State[Map[String, Int], St, *]](str)
+    countWordsM[ContE.State[Map[String, Int], St, *]](str)
       .run(_ => now(st => now(st.words)))
       .value(start)
       .value
 
   def countWordsConto(str: String): Map[String, Int] =
-    countWordsM[Conto.State[Map[String, Int], St, *]](str)
-      .run(_ => st => Conto.Pure(st.words))(start)
+    countWordsM[Cont.State[Map[String, Int], St, *]](str)
+      .run(_ => st => Cont.Pure(st.words))(start)
       .evalue
 
 
