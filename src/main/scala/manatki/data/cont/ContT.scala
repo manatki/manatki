@@ -1,58 +1,58 @@
 package manatki.data.cont
 
-import ContT.{FlatMap, Pure}
+//import ContT.{FlatMap, Pure}
 import cats.mtl.MonadState
 import cats.{Functor, Monad, StackSafeMonad}
 import tofu.Raise
 
-sealed trait ContT[+F[_], R, A] {
-  def map[B](f: A => B): ContT[F, R, B]                  = flatMap(a => ContT.Pure(f(a)))
-  def flatMap[B](f: A => ContT[F, R, B]): ContT[F, R, B] = FlatMap[R, A, B](this, f)
-  def run(f: A => R): R                                  = map(f).evalue
-}
-
-object ContT extends ContToInstances {
-  type StateF[S, A]   = S => Ev[A]
-  type State[R, S, A] = ContT[StateF, R, A]
-  type EvF[+F[_], X]  = ContT[F, X, X]
-  type Ev[X]          = EvF[Nothing, X]
-
-  def shift[F[_], R, A](cn: Shift[F, R, A]): ContT[F, R, A] = cn
-
-  case class Pure[R, A](a: A)                                                    extends ContT[Nothing, R, A]
-  case class FlatMap[+F[_], R, A, B](fa: ContT[F, R, A], f: A => ContT[F, R, B]) extends ContT[F, R, B]
-  trait Shift[F, R, A] extends ContT[F, R, A] {
-    def cont(kc: A => EvF[F, R]): EvF[F, R]
-  }
-  case class Reset[F[_], R, A](c: EvF[F, A]) extends ContT[F, R, A]
-
-//  implicit class EvOps[A](private val x: Ev[A]) extends AnyVal {
-//    def emap[B](f: A => B): Ev[B]         = Reset[B, A](x).map(f)
-//    def eflatMap[B](f: A => Ev[B]): Ev[B] = Reset[B, A](x).flatMap(f)
-//    def evalue: A                         = loop(x)(ResetStack.id)
+//sealed trait ContT[+F[_], R, A] {
+//  def map[B](f: A => B): ContT[F, R, B]                  = flatMap(a => ContT.Pure(f(a)))
+//  def flatMap[B](f: A => ContT[F, R, B]): ContT[F, R, B] = FlatMap[R, A, B](this, f)
+//  def run(f: A => R): R                                  = map(f).evalue
+//}
+//
+//object ContT extends ContToInstances {
+//  type StateF[S, A]   = S => Ev[A]
+//  type State[R, S, A] = ContT[StateF, R, A]
+//  type EvF[+F[_], X]  = ContT[F, X, X]
+//  type Ev[X]          = EvF[Nothing, X]
+//
+//  def shift[F[_], R, A](cn: Shift[F, R, A]): ContT[F, R, A] = cn
+//
+//  case class Pure[R, A](a: A)                                                    extends ContT[Nothing, R, A]
+//  case class FlatMap[+F[_], R, A, B](fa: ContT[F, R, A], f: A => ContT[F, R, B]) extends ContT[F, R, B]
+//  trait Shift[F, R, A] extends ContT[F, R, A] {
+//    def cont(kc: A => EvF[F, R]): EvF[F, R]
 //  }
-
-  import ResetStack._
-
-  def step[F[_]: Functor, R, U](conto: EvF[F, R])(stack: ResetStack[F, R, U]): Either[F[NextStep[F, _, U]], U] =
-    conto match {
-      case Pure(a) =>
-        stack match {
-          case e: End[R, U]  => Right(e.to(a))
-          case Step(f, tail) => step(f(a))(tail)
-        }
-
-      case u: Shift[R, R] => step(u.cont(a => Pure(a)))(stack)
-      case Reset(c)       => step(c)(stack)
-      case fm: FlatMap[R, x, R] =>
-        type X = x
-        fm.fa match {
-          case Pure(b)               => step(fm.f(b))(stack)
-          case Reset(c)              => step(c)(Step(fm.f, stack))
-          case fm2: FlatMap[R, y, X] => step(FlatMap[R, y, R](fm2.fa, y => FlatMap[R, x, R](fm2.f(y), fm.f)))(stack)
-          case u: Shift[R, X]        => step(u.cont(x => fm.f(x)))(stack)
-        }
-    }
+//  case class Reset[F[_], R, A](c: EvF[F, A]) extends ContT[F, R, A]
+//
+////  implicit class EvOps[A](private val x: Ev[A]) extends AnyVal {
+////    def emap[B](f: A => B): Ev[B]         = Reset[B, A](x).map(f)
+////    def eflatMap[B](f: A => Ev[B]): Ev[B] = Reset[B, A](x).flatMap(f)
+////    def evalue: A                         = loop(x)(ResetStack.id)
+////  }
+//
+//  import ResetStack._
+//
+//  def step[F[_]: Functor, R, U](conto: EvF[F, R])(stack: ResetStack[F, R, U]): Either[F[NextStep[F, _, U]], U] =
+//    conto match {
+//      case Pure(a) =>
+//        stack match {
+//          case e: End[R, U]  => Right(e.to(a))
+//          case Step(f, tail) => step(f(a))(tail)
+//        }
+//
+//      case u: Shift[R, R] => step(u.cont(a => Pure(a)))(stack)
+//      case Reset(c)       => step(c)(stack)
+//      case fm: FlatMap[R, x, R] =>
+//        type X = x
+//        fm.fa match {
+//          case Pure(b)               => step(fm.f(b))(stack)
+//          case Reset(c)              => step(c)(Step(fm.f, stack))
+//          case fm2: FlatMap[R, y, X] => step(FlatMap[R, y, R](fm2.fa, y => FlatMap[R, x, R](fm2.f(y), fm.f)))(stack)
+//          case u: Shift[R, X]        => step(u.cont(x => fm.f(x)))(stack)
+//        }
+//    }
 //
 //  def callCC[R, A, B](f: (A => ContT[R, B]) => ContT[R, A]): ContT[R, A] =
 //    shift(k => f(a => shift(_ => k(a))).flatMap(k))
@@ -84,26 +84,26 @@ object ContT extends ContToInstances {
 //    def raise[A](err: R): State[R, S, A]      = raiseError(err)
 //  }
 
-  final case class NextStep[+F[_], R, U](cont: EvF[F, R], stack: ResetStack[F, R, U])
+//  final case class NextStep[+F[_], R, U](cont: EvF[F, R], stack: ResetStack[F, R, U])
 
 
-}
+//}
 //trait ContToInstances { self: ContT.type =>
 //  implicit def contoStateMonad[S, R]: MonadState[State[R, S, *], S] = new ContToStateMonad
 //  implicit def contoMonad[R]: Monad[ContT[R, *]]                    = new ContToMonad
 //}
-
-sealed trait ResetStack[+F[_], A, R]
-
-object ResetStack {
-  private val anyEnd: End[Any, Any] = x => x
-  def id[A]: End[A, A]              = anyEnd.asInstanceOf[End[A, A]]
-
-  trait End[A, R] extends ResetStack[Nothing, A, R] {
-    def to(a: A): R
-    def apply(a: A): ContT[Nothing, R, R] = Pure(to(a))
-  }
-
-  final case class Step[F[_], A, B, R](head: A => ContT[F, B, B], tail: ResetStack[F, B, R]) extends ResetStack[F, A, R]
-}
+//
+//sealed trait ResetStack[+F[_], A, R]
+//
+//object ResetStack {
+//  private val anyEnd: End[Any, Any] = x => x
+//  def id[A]: End[A, A]              = anyEnd.asInstanceOf[End[A, A]]
+//
+//  trait End[A, R] extends ResetStack[Nothing, A, R] {
+//    def to(a: A): R
+//    def apply(a: A): ContT[Nothing, R, R] = Pure(to(a))
+//  }
+//
+//  final case class Step[F[_], A, B, R](head: A => ContT[F, B, B], tail: ResetStack[F, B, R]) extends ResetStack[F, A, R]
+//}
 

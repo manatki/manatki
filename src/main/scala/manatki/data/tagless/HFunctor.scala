@@ -69,8 +69,6 @@ object HMonad {
     def hflatMap[F[_]: Functor, G[_]: Functor, A](tfa: Free[F, A])(t: F ~> Free[G, *]): Free[G, A] = tfa.foldMap(t)
   }
 }
-
-
 @typeclass trait DFlatMap[U[_[_], _]] extends HFlatMap[U] {
   override def hflatMap[F[_]: Functor, G[_]: Functor, A](tfa: U[F, A])(t: F ~> U[G, *]): U[G, A] =
     dflatMap(tfa, DayClosure.fromTrans(t)(()))((a, _) => Eval.now(a))
@@ -79,7 +77,6 @@ object HMonad {
       f: (A, B) => Eval[C]
   ): U[G, C]
 }
-
 
 // Tensorial (day) strong monad
 @typeclass trait DMonad[U[_[_], _]] extends DFlatMap[U] with DMonoidal[U] with HMonad[U] {
@@ -102,4 +99,14 @@ object HMonad {
 
       }
     )(xya)
+}
+
+object DMonad {
+  trait ViaStrength[U[_[_], _]] extends DMonad[U] {
+    def strength1[F[_]: Functor, G[_]: Functor, A](d: Day[F, U[G, *], A])
+    def hflatMap1[F[_]: Functor, G[_]: Functor, A](tfa: Free[F, A])(t: F ~> Free[G, *]): Free[G, A]
+
+
+    def dflatMap[F[_] : Functor, G[_] : Functor, A, B, C](fa: U[F, A], k: DayClosure[F, U[G, *], B])(f: (A, B) => Eval[C]): U[G, C] = ???
+  }
 }
