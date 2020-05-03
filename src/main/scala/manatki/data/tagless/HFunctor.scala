@@ -7,6 +7,12 @@ import simulacrum.typeclass
 import tofu.syntax.functionK
 import tofu.syntax.functionK.funK
 import tofu.syntax.monadic._
+import cats.Monad
+import cats.StackSafeMonad
+import manatki.data.tagless.HFree.Pure
+import manatki.free.FunK
+import manatki.data.tagless.HFree.Bind
+import manatki.data.tagless.HFree.HBind
 
 @typeclass
 trait HFunctor[U[_[_], _]] {
@@ -99,6 +105,45 @@ object HMonad {
 
       }
     )(xya)
+}
+
+sealed trait HFree[+U[+_[_], _], +F[_], A]
+
+object HFree {
+  final case class Pure[A](a: A) extends HFree[Nothing, Nothing, A]
+  final case class Bind[+U[+_[_], _], +F[_], A, B](fa: F[A], cont: A => HFree[U, F, B]) extends HFree[U, F, B]
+  final case class HBind[U[_[_], _], F[_], G[_], A, B](
+      base: U[F, A],
+      hcont: F FunK HFree[U, G, *],
+      cont: A => HFree[U, G, B],
+  ) extends HFree[U, G, B]
+
+  val absurdity: Nothing FunK HFree[Nothing, Nothing, *] = FunK[Nothing](x => x)
+
+  private [this] val monadInstanceAny = new MonadInstance[Any, Any]
+  implicit def monadInstance[U[+_[_], _], F[_]] : Monad[HFree[U, F, *]] = 
+    monadInstanceAny.asInstanceOf[Monad[HFree[U, F, *]]]
+
+  class MonadInstance[U[+_[_], _], F[_]] extends StackSafeMonad[HFree[U, F, *]] {
+    def flatMap[A, B](fa: HFree[U, F, A])(f: A => HFree[U, F, B]): HFree[U, F, B] = fa match {
+      case Pure(a) => f(a)
+      case fm: Bind[U, F, a, _] => Bind[U, F, a, B](fm.fa, a => flatMap(fm.cont(a))(f)) 
+      case hfm: HBind[U, f, F, a, _] => 
+        HBind[U, f, F, a, B](hfm.base, hfm.hcont, a => flatMap(hfm.cont(a))(f))
+    }
+    def pure[A](x: A): HFree[U, F, A] = Pure(x)
+  }
+
+  class HMonadInstace[U[+_[_], _]] extends HMonad[HFree[U, *[_], *]]{
+    def functor[F[_]: Functor]: Functor[HFree[U, F, *]] = monadInstance
+    def hflatMap[F[_]: Functor, G[_]: Functor, A](tfa: HFree[U,F,A])(t: F ~> HFree[U,G, *]): HFree[U,G,A] = 
+      tfa match {
+        case pa: Pure[A] => pa
+        // case Bind(fa, cont) => hflatMap(t(fa))
+        case HBind(base, hcont, cont) => ???
+      }
+    def hpure[F[_]: Functor, A](fa: F[A]): HFree[U,F,A] = Bind[Nothing,F, A, A](fa, Pure(_))
+  }
 }
 
 object DMonad {
