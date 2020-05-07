@@ -1,6 +1,8 @@
 package manatki.err.proc
 
+import cats.data.EitherT
 import cats.{Bifunctor, Monad, StackSafeMonad}
+import tofu.syntax.monadic._
 
 import scala.annotation.tailrec
 
@@ -57,7 +59,7 @@ trait Proc[F[_, _]] extends BiMonad[F, F] { self =>
     def flatMap[A, B](fa: F[E, A])(f: A => F[E, B]): F[E, B] = foldWith[E, A, E, B](fa, raise, f)
   }
 
-  val bifunctor: Bifunctor[F] = new Bifunctor[F] {
+  def bifunctor: Bifunctor[F] = new Bifunctor[F] {
     def bimap[A, B, C, D](fab: F[A, B])(f: A => C, g: B => D): F[C, D] =
       foldWith[A, B, C, D](fab, a => raise(f(a)), b => pure(g(b)))
   }
@@ -101,12 +103,24 @@ class ProcSyntax[F[+_, +_], E, A](private val self: F[E, A]) extends AnyVal {
   def void(implicit F: Proc[F]): F[E, Unit] = F.monad.void(self)
 }
 
-object Proc extends ProcRecInstanceChain[Proc]
+object Proc extends ProcRecInstanceChain[Proc]{
+  def pure[F[_, _]] = new PureApp[F](true)
+  class PureApp[F[_, _]](private val __ : Boolean) extends AnyVal {
+    def apply[A](a: A)(implicit F: Proc[F]): F[Nothing, A] = F.pure(a)
+  }
+
+  def raise[F[_, _]] = new RaiseApp[F](true)
+  class RaiseApp[F[_, _]](private val __ : Boolean) extends AnyVal {
+    def apply[E](a: E)(implicit F: Proc[F]): F[E, Nothing] = F.raise(a)
+  }
+}
 
 object ProcRec extends ProcRecInstanceChain[ProcRec]
 
 trait ProcRecInstanceChain[TC[f[_, _]] >: ProcRec[f]] {
   implicit val eitherInstance: TC[Either] = new ProcRec[Either] {
+    import cats.instances.either._
+
     def pure[E, A](a: A): Either[E, A] = Right(a)
 
     def raise[E, A](e: E): Either[E, A] = Left(e)
@@ -132,8 +146,39 @@ trait ProcRecInstanceChain[TC[f[_, _]] >: ProcRec[f]] {
 
     override def handle[E, X, A](fa: Either[E, A], h: E => A): Either[X, A] = Right(fa.fold(h, identity))
 
-    override def monad[E]: Monad[Either[E, *]] = cats.instances.either.catsStdInstancesForEither
+    override def monad[E]: Monad[Either[E, *]] = implicitly
 
-    override val bifunctor: Bifunctor[Either] = cats.instances.either.catsStdBitraverseForEither
+    override def bifunctor: Bifunctor[Either] = implicitly
+  }
+
+  implicit def eitherTInstance[F[_]](implicit F: Monad[F]): TC[EitherT[F, *, *]] = new ProcRec[EitherT[F, *, *]] {
+    def foldRec[E, A, X, B](init: Either[E, A])(
+        step: Either[E, A] => EitherT[F, Either[E, X], Either[A, B]]
+    ): EitherT[F, X, B] =
+      EitherT(init.tailRecM {
+        step(_).value.map {
+          case Left(Left(e))   => Left(Left(e))
+          case Left(Right(x))  => Right(Left(x))
+          case Right(Left(a))  => Left(Right(a))
+          case Right(Right(b)) => Right(Right(b))
+        }
+      })
+
+    def pure[E, A](a: A): EitherT[F, E, A] = EitherT.rightT(a)
+
+    def raise[E, A](e: E): EitherT[F, E, A] = EitherT.leftT(e)
+
+    def foldWith[E, A, X, R](
+        fa: EitherT[F, E, A],
+        h: E => EitherT[F, X, R],
+        f: A => EitherT[F, X, R]
+    ): EitherT[F, X, R] =
+      fa.biflatMap(h, f)
+
+    override def fromEither[E, A](ea: Either[E, A]): EitherT[F, E, A] = EitherT.fromEither(ea)
+
+    override def monad[E]: Monad[EitherT[F, E, *]] = implicitly
+
+    override val bifunctor: Bifunctor[EitherT[F, *, *]] = implicitly
   }
 }
