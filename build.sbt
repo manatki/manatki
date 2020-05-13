@@ -18,6 +18,7 @@ libraryDependencies += "org.typelevel"              %% "cats-effect"         % V
 libraryDependencies += "org.typelevel"              %% "cats-mtl-core"       % Version.catsMtl
 libraryDependencies += "org.typelevel"              %% "cats-tagless-macros" % Version.catsTagless
 libraryDependencies += "ru.tinkoff"                 %% "tofu-core"           % Version.tofu
+libraryDependencies += "ru.tinkoff"                 %% "tofu-derivation"     % Version.tofu
 libraryDependencies += "ru.tinkoff"                 %% "tofu-concurrent"     % Version.tofu
 libraryDependencies += "ru.tinkoff"                 %% "tofu-optics-macro"   % Version.tofu
 libraryDependencies += "com.github.julien-truffaut" %% "monocle-macro"       % Version.monocle

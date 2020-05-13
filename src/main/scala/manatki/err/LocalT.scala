@@ -1,6 +1,5 @@
 package manatki.err
 
-import manatki.err.LocalT.{FlatMap, FoldWith}
 import manatki.err.proc._
 
 trait LocalT[+F[+_, +_], C[f[_, _]], +E, +A] { self =>
@@ -14,7 +13,8 @@ trait LocalT[+F[+_, +_], C[f[_, _]], +E, +A] { self =>
   def flatMap[F1[+e, +a] >: F[e, a]: Proc, E1 >: E, B](f: A => LocalT[F1, C, E1, B]): LocalT[F1, C, E1, B] =
     new LocalT.FlatMap(self, f)
 
-  def handleWith[F1[+e, +a] >: F[e, a]: Proc, X, A1 >: A](f: E => LocalT[F1, C, X, A1]): LocalT[F1, C, X, A1] = ???
+  def handleWith[F1[+e, +a] >: F[e, a]: Proc, X, A1 >: A](f: E => LocalT[F1, C, X, A1]): LocalT[F1, C, X, A1] =
+    new LocalT.HandleWith(self, f)
 
 }
 
@@ -100,12 +100,21 @@ object LocalT {
     override def run[F1[+e, +a] >: F[e, a]: Proc](context: C[F1]): F1[X, A] =
       self.run(context).handleWith(h(_).run(context))
 
-    override def handleWith[F1[+e, +a] >: F[e, a]: Proc, Y, A1 >: A](j: X => LocalT[F1, C, Y, A1]): LocalT[F1, C, Y, A1] =
+    override def handleWith[F1[+e, +a] >: F[e, a]: Proc, Y, A1 >: A](
+        j: X => LocalT[F1, C, Y, A1]
+    ): LocalT[F1, C, Y, A1] =
       self.handleWith(h(_).handleWith(j))
   }
 
-  private class Successful[+F[+_, +_], C[f[_, _]], A](val fa: F[Nothing, A]) extends LocalT[F, C, Nothing, A] {
+  private class Successful[+F[+_, +_]: Proc, C[f[_, _]], A](val fa: F[Nothing, A]) extends LocalT[F, C, Nothing, A] {
     def run[F1[+e, +a] >: F[e, a]: Proc](context: C[F1]): F1[Nothing, A] = fa
+
+    override def foldWith[F1[+e, +a] >: F[e, a], X, B](
+        h: Nothing => LocalT[F1, C, X, B],
+        f: A => LocalT[F1, C, X, B]
+    ): LocalT[F1, C, X, B] = new LocalT[F1, C, X, B] {
+      def run[F2[+e, +a] >: F1[e, a]: Proc](context: C[F2]): F2[X, B] = fa.flatMap(f(_).run(context))
+    }
   }
 
   private class Pure[+F[+_, +_]: Proc, C[f[_, _]], A](val a: A) extends Successful[F, C, A](Proc.pure[F](a))

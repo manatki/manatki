@@ -5,5 +5,5 @@ package object err {
     type Result
   }
 
-  type CtxLoc[C, F[+_, +_]] = C {type Eff[e, a] = LocalT[F, C, e, a]}
+//  type CtxLoc[C, F[+_, +_]] = C {type Eff[e, a] = LocalT[F, C, e, a]}
 }

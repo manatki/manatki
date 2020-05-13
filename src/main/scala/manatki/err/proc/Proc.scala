@@ -83,14 +83,15 @@ trait ProcRec[F[_, _]] extends Proc[F] { self =>
 }
 
 class ProcSyntax[F[+_, +_], E, A](private val self: F[E, A]) extends AnyVal {
-  def flatMap[E1 >: E, B](f: A => F[E1, B])(implicit F: Proc[F]): F[E1, B] =
+  def flatMap[F1[+e, +a] >: F[e, a], E1 >: E, B](f: A => F1[E1, B])(implicit F: Proc[F1]): F1[E1, B] =
     F.monad[E1].flatMap(self)(f)
 
   def map[B](f: A => B)(implicit F: Proc[F]): F[E, B] = F.monad[E].map(self)(f)
 
   def mapErr[X](f: E => X)(implicit F: Proc[F]): F[X, A] = F.bifunctor.leftMap(self)(f)
 
-  def handleWith[X, A1 >: A](f: E => F[X, A1])(implicit F: Proc[F]): F[X, A1] = F.handleWith(self, f)
+  def handleWith[F1[+e, +a] >: F[e, a], X, A1 >: A](f: E => F1[X, A1])(implicit F: Proc[F1]): F1[X, A1] =
+    F.handleWith(self, f)
 
   def handle[A1 >: A](f: E => A1)(implicit F: Proc[F]): F[Nothing, A1] = F.handle(self, f)
 
@@ -103,7 +104,7 @@ class ProcSyntax[F[+_, +_], E, A](private val self: F[E, A]) extends AnyVal {
   def void(implicit F: Proc[F]): F[E, Unit] = F.monad.void(self)
 }
 
-object Proc extends ProcRecInstanceChain[Proc]{
+object Proc extends ProcRecInstanceChain[Proc] {
   def pure[F[_, _]] = new PureApp[F](true)
   class PureApp[F[_, _]](private val __ : Boolean) extends AnyVal {
     def apply[A](a: A)(implicit F: Proc[F]): F[Nothing, A] = F.pure(a)
