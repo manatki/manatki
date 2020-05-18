@@ -33,8 +33,8 @@ object ProCorepK {
   def tabulateK[P[_[_], _[_]], F[_], G[_]](k: RepK[P[F, *[_]], *] ~> G)(implicit P: ProCorepK[P]): P[F, G] =
     P.tabulateK(k)
 
-  def constructK[P[-_[_], +_[_]]: ProCorepK]: P[Layer1[P, *], Layer1[P, *]] =
-    tabulateK[P, Layer1[P, *], Layer1[P, *]](funK(_(constructK)))
+  def constructK[P[-_[_], +_[_]]: ProCorepK]: P[Platform[P, *], Platform[P, *]] =
+    tabulateK[P, Platform[P, *], Platform[P, *]](funK(_(constructK)))
 }
 
 @typeclass
