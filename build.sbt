@@ -9,6 +9,8 @@ val akkas =
     case (module, libVersion) => "com.typesafe.akka" %% s"akka-$module" % libVersion
   }
 
+val circes = List("core", "parser").map(module => "io.circe" %% s"circe-$module" % Version.circe)
+
 libraryDependencies += "org.typelevel"              %% "cats-core"           % Version.cats withSources ()
 libraryDependencies += "com.chuusai"                %% "shapeless"           % Version.shapeless withSources ()
 libraryDependencies += "org.typelevel"              %% "cats-free"           % Version.cats
@@ -24,6 +26,7 @@ libraryDependencies += "ru.tinkoff"                 %% "tofu-optics-macro"   % V
 libraryDependencies += "com.github.julien-truffaut" %% "monocle-macro"       % Version.monocle
 libraryDependencies += "com.github.julien-truffaut" %% "monocle-state"       % Version.monocle
 libraryDependencies += "org.typelevel"              %% "simulacrum"          % Version.simulacrum
+libraryDependencies += "org.typelevel"              %% "spire"               % Version.spire
 
 //libraryDependencies += "ru.tinkoff"                 %% "tofu-optics-interop" % Version.tofu
 //libraryDependencies += "io.higherkindness"          %% "droste-core"         % Version.droste
@@ -52,7 +55,7 @@ val testSettings = List(
   libraryDependencies += "org.scalatestplus" %% "scalatestplus-scalacheck" % Version.scalaTestCheck % "test",
 )
 
-lazy val akka = project.settings(libraryDependencies ++= akkas)
+lazy val akka = project.settings(libraryDependencies ++= akkas ++ circes)
 
 lazy val fsfs = project
   .settings(libraryDependencies += ("co.fs2" %% "fs2-io" % Version.fs2) withSources ())

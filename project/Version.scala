@@ -40,4 +40,8 @@ object Version {
   val discipline = "1.0.0"
 
   val simulacrum = "1.0.0"
+
+  val spire = "0.17.0-M1"
+
+  val circe = "0.13.0"
 }
