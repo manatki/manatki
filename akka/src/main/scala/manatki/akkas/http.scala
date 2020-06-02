@@ -26,7 +26,7 @@ object http {
 
 
 
-  //by request of @imgestalt 2.06.2020 8:21
+  //requested by @imgestalt 2.06.2020 8:21
   implicit def headerCodec: Codec.AsArray[HttpHeader] = new Codec.AsArray[HttpHeader]{
     def encodeArray(a: HttpHeader): Vector[Json] = Vector(a.name().asJson, a.value().asJson)
 
