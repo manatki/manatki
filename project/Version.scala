@@ -42,4 +42,8 @@ object Version {
   val simulacrum = "1.0.0"
 
   val http4s = "0.21.4"
+  
+  val spire = "0.17.0-M1"
+
+  val circe = "0.13.0"
 }
