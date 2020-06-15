@@ -61,7 +61,8 @@ lazy val fsfs = project
   .settings(
     libraryDependencies += "ru.tinkoff" %% "tofu-core"     % Version.tofu,
     libraryDependencies += ("co.fs2"    %% "fs2-io"        % Version.fs2) withSources (),
-    libraryDependencies += "org.http4s" %% "http4s-server" % Version.http4s
+    libraryDependencies += "org.http4s" %% "http4s-server" % Version.http4s,
+    plugins,
   )
   .settings(testSettings)
 
