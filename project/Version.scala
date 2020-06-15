@@ -40,4 +40,6 @@ object Version {
   val discipline = "1.0.0"
 
   val simulacrum = "1.0.0"
+
+  val http4s = "0.21.4"
 }

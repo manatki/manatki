@@ -23,10 +23,10 @@ object AsP{
   def reflSub[P[-i[_], +o[_]], Q[-i[_], +o[_]] >: P[i, o]]: AsP[P, Q] = refl[P]
 }
 
-trait DKnot[-P[-i[_], +o[_]], -L[-i[_], +o[_]], A] {
+trait Kneet[-P[-i[_], +o[_]], -L[-i[_], +o[_]], A] {
   type P1[-i[_], +o[_]] >: P[i, o]
   type L1[-i[_], +o[_]] >: L[i, o]
-  type KPL[a] = DKnot[P1, L1, a]
+  type KPL[a] = Kneet[P1, L1, a]
 
   def asP: AsP[P, P1] = AsP.reflSub[P, P1]
   def asL: AsP[L, L1] = AsP.reflSub[L, L1]
@@ -53,7 +53,7 @@ object Platform {
       fx match {
         case Pure(a) => f(a)
         case _ =>
-          type F[+p[-i[_], +o[_]]] = EvalP[DKnot[fx.P1, p, *], EvalCont[B, *]]
+          type F[+p[-i[_], +o[_]]] = EvalP[Kneet[fx.P1, p, *], EvalCont[B, *]]
           fx.run(fx.asL.subst[F](new ValueFlatMapEval[B])).apply(f)
       }
   }
@@ -71,7 +71,7 @@ object Platform {
       case Pure(a)        => a
       case FlatMap(fx, f) => f(fx).value
       case e1             =>
-        type F[+p[-i[_], +o[_]]] = EvalP[DKnot[e1.P1, p, *], Eval]
+        type F[+p[-i[_], +o[_]]] = EvalP[Kneet[e1.P1, p, *], Eval]
         e1.run(e1.asL.subst[F](ValueEval)).value
     }
   }

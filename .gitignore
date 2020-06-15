@@ -4,3 +4,4 @@ project/target
 .bin
 .metals
 .bloop
+/project/metals.sbt

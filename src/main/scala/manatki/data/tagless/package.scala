@@ -10,7 +10,7 @@ package object tagless {
   type UnitF[A]                 = Unit
   type HFunction[F[_], G[_], A] = F[A] => G[A]
 
-  type Platform[-P[-i[_], +o[_]], A] = DKnot[P, Any, A]
+  type Platform[-P[-i[_], +o[_]], A] = Kneet[P, Any, A]
 
-  type Act[-L[-i[_], +o[_]], A] = DKnot[Any, L, A]
+  type Act[-L[-i[_], +o[_]], A] = Kneet[Any, L, A]
 }
