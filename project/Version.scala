@@ -27,9 +27,9 @@ object Version {
 
   val scalaTestCheck = "3.1.0.0-RC2"
 
-  val tofu = "0.7.4"
+  val tofu = "0.7.7"
 
-  val zio = "1.0.0-RC17"
+  val zio = "1.0.0-RC21-2"
 
   val zioMacros = "0.6.2"
 

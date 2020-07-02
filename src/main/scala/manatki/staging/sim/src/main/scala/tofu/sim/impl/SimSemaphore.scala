@@ -29,5 +29,5 @@ case class SimSemaphore[F[+_, _]: IOMonad[*[_, _], E]: VoidMonad: STMVMonad: Tra
   def releaseN(n: Long): F[RUN[E], Unit]           =
     tvar.read.flatMap(count => tvar.write((count - n).max(0))).atomically
   def withPermit[A](t: F[RUN[E], A]): F[RUN[E], A] =
-    (acquire *> t).guaranteeIf(_ => release)
+    (acquire *> t).guaranteeOpt(_ => release)
 }
