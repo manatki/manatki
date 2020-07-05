@@ -1,7 +1,6 @@
 package manatki.data.day
 import cats.{Eval, Functor, Id, ~>}
-import tofu.syntax.functionK
-import tofu.syntax.functionK.funK
+import tofu.syntax.funk.funK
 import tofu.syntax.monadic._
 
 trait DayClosure[F[_], G[_], A] {

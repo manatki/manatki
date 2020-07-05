@@ -73,9 +73,9 @@ object CountWords {
 
 
   def run(args: List[String]): IO[ExitCode] =
-    IO(println(countWordsConto(getString))) *>
-      IO(println(countWordsState(getString))) *>
-      IO(println(countWordsCont(getString))) *>
+    IO(println(countWordsConto(getString()))) *>
+      IO(println(countWordsState(getString()))) *>
+      IO(println(countWordsCont(getString()))) *>
 //      IO(println(countWordsContT(getString))) *> // SO
       IO(ExitCode.Success)
 }

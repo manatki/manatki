@@ -12,7 +12,7 @@ import cats.syntax.apply._
 
 sealed trait MIO_1[-R, S, +E, +A] {
   final def run(r: R, init: S)(implicit ec: EC): Future[(S, Either[E, A])] = {
-    val p = Promise[(S, Either[E, A])]
+    val p = Promise[(S, Either[E, A])]()
     val cb = new MIO_1.Callback[S, E, A] {
       def raised(state: S, error: E): Unit    = p.success(state -> Left(error))
       def completed(state: S, value: A): Unit = p.success(state -> Right(value))
@@ -140,7 +140,7 @@ object MIO_1 {
       (get[S]: MIO_1[R, S, E, S]) flatMap (s =>
         Await[R, S, E, A](cb =>
           k {
-            case Left(MIOExcept(e: E)) => cb.raised(s, e)
+            case Left(MIOExcept(e: E @unchecked)) => cb.raised(s, e)
             case Left(exc)             => cb.broken(exc)
             case Right(value)          => cb.completed(s, value)
         }))
@@ -151,7 +151,7 @@ object MIO_1 {
           implicit val eci = ec
           Await[R, S, E, A] { cb =>
             val mio = k {
-              case Left(MIOExcept(e: E)) => cb.raised(s, e)
+              case Left(MIOExcept(e: E @unchecked)) => cb.raised(s, e)
               case Left(exc)             => cb.broken(exc)
               case Right(value)          => cb.completed(s, value)
             }

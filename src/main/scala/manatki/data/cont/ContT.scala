@@ -5,11 +5,11 @@ import cats.mtl.MonadState
 import cats.{Functor, Monad, StackSafeMonad}
 import tofu.Raise
 
-//sealed trait ContT[+F[_], R, A] {
+sealed trait ContT[+F[_], R, A] {
 //  def map[B](f: A => B): ContT[F, R, B]                  = flatMap(a => ContT.Pure(f(a)))
 //  def flatMap[B](f: A => ContT[F, R, B]): ContT[F, R, B] = FlatMap[R, A, B](this, f)
 //  def run(f: A => R): R                                  = map(f).evalue
-//}
+}
 //
 //object ContT extends ContToInstances {
 //  type StateF[S, A]   = S => Ev[A]

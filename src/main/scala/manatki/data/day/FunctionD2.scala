@@ -1,7 +1,7 @@
 package manatki.data.day
 import cats.{Eval, ~>}
 import cats.data.Tuple2K
-import tofu.syntax.functionK.funK
+import tofu.syntax.funk.funK
 
 trait FunctionD2[F[_], G[_], H[_]] {
   def apply[A, B, C](fa: F[A], gb: G[B])(f: (A, B) => Eval[C]): H[C]

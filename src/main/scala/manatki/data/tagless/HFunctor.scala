@@ -4,15 +4,14 @@ import cats.free.{Cofree, Free}
 import cats.{Eval, Functor, Id, ~>}
 import manatki.data.day.{Day, DayClosure, FunctionD2}
 import simulacrum.typeclass
-import tofu.syntax.functionK
-import tofu.syntax.functionK.funK
+import tofu.syntax.funk.{funK, funKFrom}
 import tofu.syntax.monadic._
 import cats.Monad
 import cats.StackSafeMonad
 import manatki.data.tagless.HFree.Pure
-import manatki.free.FunK
 import manatki.data.tagless.HFree.Bind
 import manatki.data.tagless.HFree.HBind
+import tofu.data.FunK
 
 @typeclass
 trait HFunctor[U[_[_], _]] {
@@ -87,8 +86,8 @@ object HMonad {
 // Tensorial (day) strong monad
 @typeclass trait DMonad[U[_[_], _]] extends DFlatMap[U] with DMonoidal[U] with HMonad[U] {
   def strength[F[_]: Functor, G[_]: Functor, A](d: Day[F, U[G, *], A]): U[Day[F, G, *], A] =
-    dflatMap[G, Day[F, G, *], d.Y, d.X, A](d.gy, DayClosure.mk((gy, f) => hpure(Day(d.fx, gy)(f))))(
-      (y, x) => d.run(x, y)
+    dflatMap[G, Day[F, G, *], d.Y, d.X, A](d.gy, DayClosure.mk((gy, f) => hpure(Day(d.fx, gy)(f))))((y, x) =>
+      d.run(x, y)
     )
 
   override def dmap2[F[_]: Functor, G[_]: Functor, H[_]: Functor, A, X, Y](ufx: U[F, X], ugy: U[G, Y])(
@@ -98,60 +97,72 @@ object HMonad {
       ufx,
       new DayClosure[F, U[H, *], Y] {
         def apply[D, E](fd: F[D])(yde: (Y, D) => Eval[E]): U[H, E] =
-          dflatMap[G, H, Y, D, E](ugy, new DayClosure[G, U[H, *], D] {
-            def apply[B, C](gb: G[B])(f: (D, B) => Eval[C]): U[H, C] =
-              hpure(fgh(fd, gb)(f))
-          })(yde)
+          dflatMap[G, H, Y, D, E](
+            ugy,
+            new DayClosure[G, U[H, *], D] {
+              def apply[B, C](gb: G[B])(f: (D, B) => Eval[C]): U[H, C] =
+                hpure(fgh(fd, gb)(f))
+            }
+          )(yde)
 
       }
     )(xya)
 }
 
-sealed trait HFree[+U[+_[_], _], +F[_], A]
+sealed trait HFree[+U[_[_], _], +F[_], +A] {
+  def flatMap[U1[f[_], a] >: U[f, a], F1[a] >: F[a], B](f: A => HFree[U1, F1, B]): HFree[U1, F1, B]
+  def hflatMap[U1[f[_], a] >: U[f, a], G[_]](t: F FunK HFree[U1, G, *]): HFree[U1, G, A]
+}
 
 object HFree {
-  final case class Pure[A](a: A) extends HFree[Nothing, Nothing, A]
-  final case class Bind[+U[+_[_], _], +F[_], A, B](fa: F[A], cont: A => HFree[U, F, B]) extends HFree[U, F, B]
-  final case class HBind[U[_[_], _], F[_], G[_], A, B](
+  final case class Pure[A](a: A)                                                        extends HFree[Nothing, Nothing, A] {
+    def flatMap[U1[f[_], a], F1[a], B](f: A => HFree[U1, F1, B]): HFree[U1, F1, B]    = f(a)
+    def hflatMap[U1[f[_], a], G[_]](t: Nothing FunK HFree[U1, G, *]): HFree[U1, G, A] = this
+  }
+  final case class Bind[+U[+_[_], _], +F[_], A, B](fa: F[A], cont: A => HFree[U, F, B]) extends HFree[U, F, B]             {
+    override def flatMap[U1[f[_], a] >: U[f, a], F1[a] >: F[a], C](f: B => HFree[U1, F1, C]): HFree[U1, F1, C] =
+      Bind[U1, F1, A, C](fa, a => cont(a).flatMap(f))
+    def hflatMap[U1[f[_], a] >: U[f, a], G[_]](t: F FunK HFree[U1, G, *]): HFree[U1, G, B]                     =
+      t(fa).flatMap(a => cont(a).hflatMap(t))
+  }
+  final case class HBind[+U[_[_], _], F[_], +G[_], A, +B](
       base: U[F, A],
       hcont: F FunK HFree[U, G, *],
       cont: A => HFree[U, G, B],
-  ) extends HFree[U, G, B]
+  ) extends HFree[U, G, B] {
+    def flatMap[U1[f[_], a] >: U[f, a], G1[a] >: G[a], C](f: B => HFree[U1, G1, C]): HFree[U1, G1, C] =
+      HBind[U1, F, G1, A, C](base, hcont, a => cont(a).flatMap(f))
+    def hflatMap[U1[f[_], a] >: U[f, a], H[_]](t: G FunK HFree[U1, H, *]): HFree[U1, H, B]            =
+      HBind[U1, F, H, A, B](base, funK(fa => hcont(fa).hflatMap(t)), a => cont(a).hflatMap(t))
+  }
 
-  val absurdity: Nothing FunK HFree[Nothing, Nothing, *] = FunK[Nothing](x => x)
+  val absurdity: Nothing FunK HFree[Nothing, Nothing, *] = funKFrom[Nothing](x => x)
 
-  private [this] val monadInstanceAny = new MonadInstance[Any, Any]
-  implicit def monadInstance[U[+_[_], _], F[_]] : Monad[HFree[U, F, *]] = 
+  private[this] val monadInstanceAny                                   = new MonadInstance[Any, Any]
+  implicit def monadInstance[U[+_[_], _], F[_]]: Monad[HFree[U, F, *]] =
     monadInstanceAny.asInstanceOf[Monad[HFree[U, F, *]]]
 
   class MonadInstance[U[+_[_], _], F[_]] extends StackSafeMonad[HFree[U, F, *]] {
-    def flatMap[A, B](fa: HFree[U, F, A])(f: A => HFree[U, F, B]): HFree[U, F, B] = fa match {
-      case Pure(a) => f(a)
-      case fm: Bind[U, F, a, _] => Bind[U, F, a, B](fm.fa, a => flatMap(fm.cont(a))(f)) 
-      case hfm: HBind[U, f, F, a, _] => 
-        HBind[U, f, F, a, B](hfm.base, hfm.hcont, a => flatMap(hfm.cont(a))(f))
-    }
-    def pure[A](x: A): HFree[U, F, A] = Pure(x)
+    def flatMap[A, B](fa: HFree[U, F, A])(f: A => HFree[U, F, B]): HFree[U, F, B] = fa.flatMap(f)
+    def pure[A](x: A): HFree[U, F, A]                                             = Pure(x)
   }
 
-  class HMonadInstace[U[+_[_], _]] extends HMonad[HFree[U, *[_], *]]{
-    def functor[F[_]: Functor]: Functor[HFree[U, F, *]] = monadInstance
-    def hflatMap[F[_]: Functor, G[_]: Functor, A](tfa: HFree[U,F,A])(t: F ~> HFree[U,G, *]): HFree[U,G,A] = 
-      tfa match {
-        case pa: Pure[A] => pa
-        // case Bind(fa, cont) => hflatMap(t(fa))
-        case HBind(base, hcont, cont) => ???
-      }
-    def hpure[F[_]: Functor, A](fa: F[A]): HFree[U,F,A] = Bind[Nothing,F, A, A](fa, Pure(_))
+  class HMonadInstance[U[+_[_], _]] extends HMonad[HFree[U, *[_], *]] {
+    def functor[F[_]: Functor]: Functor[HFree[U, F, *]]                                                        = monadInstance
+    def hflatMap[F[_]: Functor, G[_]: Functor, A](tfa: HFree[U, F, A])(t: F ~> HFree[U, G, *]): HFree[U, G, A] =
+      tfa.hflatMap(funK(fa => t(fa)))
+    def hpure[F[_]: Functor, A](fa: F[A]): HFree[U, F, A]                                                      =
+      Bind[Nothing, F, A, A](fa, Pure(_))
   }
 }
 
 object DMonad {
   trait ViaStrength[U[_[_], _]] extends DMonad[U] {
-    def strength1[F[_]: Functor, G[_]: Functor, A](d: Day[F, U[G, *], A])
+    def strength1[F[_]: Functor, G[_]: Functor, A](d: Day[F, U[G, *], A]): U[Day[F, G, *], A]
     def hflatMap1[F[_]: Functor, G[_]: Functor, A](tfa: Free[F, A])(t: F ~> Free[G, *]): Free[G, A]
 
-
-    def dflatMap[F[_] : Functor, G[_] : Functor, A, B, C](fa: U[F, A], k: DayClosure[F, U[G, *], B])(f: (A, B) => Eval[C]): U[G, C] = ???
+    def dflatMap[F[_]: Functor, G[_]: Functor, A, B, C](fa: U[F, A], k: DayClosure[F, U[G, *], B])(
+        f: (A, B) => Eval[C]
+    ): U[G, C] = ???
   }
 }

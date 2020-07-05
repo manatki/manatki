@@ -279,7 +279,7 @@ object MIO {
   final def runCancelable[R, I, O, C, E, A](mio: MIO[R, I, O, C, E, A], add: Callback[O, C, E, A] = Callback.empty)(
       r: R,
       init: I)(implicit ec: EC): (Future[Result[O, C, E, A]], C => Unit) = {
-    val p           = Promise[Result[O, C, E, A]]
+    val p           = Promise[Result[O, C, E, A]]()
     val cancelation = new AtomicReference[C]
     val cb = add + new MIO.Callback[O, C, E, A] {
       def raised(state: O, error: E): Unit    = p.success(Failed(state, error))

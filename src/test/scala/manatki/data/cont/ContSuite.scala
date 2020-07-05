@@ -17,8 +17,9 @@ import org.scalatest.FlatSpec
 import Monoid.empty
 import org.scalatest.concurrent.TimeLimitedTests
 import org.scalatest.time.{Second, Span}
+import org.scalatest.flatspec.AnyFlatSpec
 
-class ContSuite extends FlatSpec with TimeLimitedTests {
+class ContSuite extends AnyFlatSpec with TimeLimitedTests {
 
   val timeLimit = Span(1, Second)
 

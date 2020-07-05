@@ -12,7 +12,7 @@ import scala.util.control.NonFatal
 
 sealed trait MIO_4[-R, -S1, +S2, +E, +A] {
   final def run(r: R, init: S1)(implicit ec: EC): Future[(S2, Either[E, A])] = {
-    val p = Promise[(S2, Either[E, A])]
+    val p = Promise[(S2, Either[E, A])]()
     val cb = new MIO_4.Callback[S2, E, A] {
       def raised(state: S2, error: E): Unit    = p.success(state -> Left(error))
       def completed(state: S2, value: A): Unit = p.success(state -> Right(value))
@@ -238,7 +238,7 @@ object MIO_4 {
       get[S] flatMap (s =>
         Await[R, S, E, A](cb =>
           k {
-            case Left(MIOExcept(e: E)) => cb.raised(s, e)
+            case Left(MIOExcept(e: E @unchecked)) => cb.raised(s, e)
             case Left(exc)             => cb.broken(exc)
             case Right(value)          => cb.completed(s, value)
         }))
@@ -248,7 +248,7 @@ object MIO_4 {
         case (r, s, ec) =>
           Await[R, S, E, A] { cb =>
             val mio = k {
-              case Left(MIOExcept(e: E)) => cb.raised(s, e)
+              case Left(MIOExcept(e: E @unchecked)) => cb.raised(s, e)
               case Left(exc)             => cb.broken(exc)
               case Right(value)          => cb.completed(s, value)
             }
