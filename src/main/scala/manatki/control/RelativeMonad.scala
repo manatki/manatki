@@ -46,7 +46,7 @@ object RelativeMonad {
       }
   }
 
-  type MonadReader[F[_], R] = ApplicativeLocal[F, R] with StackSafeMonad[F]
+  trait MonadReader[F[_], R] extends ApplicativeLocal[F, R] with StackSafeMonad[F]
   class Reader[R] extends Module[R => *, MonadReader[*[_], R]] {
     def from[F[_]](rm: RelativeMonad[Function[R, *], F]): MonadReader[F, R] =
       new MonadReader[F, R] {
@@ -57,9 +57,10 @@ object RelativeMonad {
         def ask: F[R]                                   = rm.rpure(identity)
         def reader[A](f: R => A): F[A]                  = rm.rpure(f)
         def pure[A](x: A): F[A]                         = rm.rpure(_ => x)
-        def flatMap[A, B](fa: F[A])(f: A => F[B]): F[B] = rm.rflatMap(fa){
-          g => rm.rflatMap(ask)(h => ???)
-        }
+        def flatMap[A, B](fa: F[A])(f: A => F[B]): F[B] =
+          rm.rflatMap(fa) { g =>
+            rm.rflatMap(ask)(h => ???)
+          }
       }
 
     def to[F[_]](tc: MonadReader[F, R]): RelativeMonad[Function[R, *], F] = ???

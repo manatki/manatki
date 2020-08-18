@@ -1,7 +1,7 @@
 package manatki.syntax
 
 import cats.FlatMap
-import manatki.higherKinded.Embed
+import tofu.higherKind.Embed
 
 object embed {
   implicit class EmbedOps[T[_[_]], F[_]](private val ft: F[T[F]]) extends AnyVal {
