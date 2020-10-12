@@ -1,11 +1,8 @@
 package manatki.data
-package scalagroup
 
-import cats.data.{Nested, ZipList}
-import cats.{Applicative, Apply, Functor, Id, Monad, Parallel, ~>}
-import shapeless._
+import cats._
+import shapeless.{Id => _, _}
 import tofu.syntax.monadic._
-import cats.instances.list._
 
 object BigTraverse extends App {
 
