@@ -14,7 +14,7 @@ case class Product[F[_]](
 )
 ```
 
-one can achieve a lot of helpful things over than just `case class` without `F[_]`, e.g.  
+one can achieve a lot of helpful things over just `case class` without `F[_]`, e.g.  
 - original data is restorable as `Product[Id]` 
 - `Product[Option]` could work as a functional builder,
 - `Product[Either[String, A]]` as a validation result, 
@@ -22,7 +22,7 @@ one can achieve a lot of helpful things over than just `case class` without `F[_
 - `Product[Stream[IO, *]]` could work as a reactive dataframe with good types
 - many others... 
 
-HKD Patterns should be described in some posts soon.
+I'll try to describe HKD Patterns in some near future in the blog.
 
 
 A good typeclass equipment is crucial to make the future bright for the HKD. So one needs some essential type classes and a lot of utility type classes. Latter means we need some generic derivation library such as magnolia is for simple types.
