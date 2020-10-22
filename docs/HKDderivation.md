@@ -90,8 +90,8 @@ again instance for `Product` is definet trivially using the `cats.syntax.apply` 
 ```scala
 implicit val productSequence: SequenceK[Product] =
   new SequenceK[Product] {
-    def sequenceK[F[_]: Applicative](uf: Product[F]): F[Product[Id]] =
-      (uf.name, uf.category, uf.price).mapN(Product.apply[Id])
+    def sequenceK[F[_]: Applicative, G[_]](uf: Product[Composed[F, G, *]]): F[Product[G]] =
+      (uf.name, uf.category, uf.price).mapN(Product.apply[G])
   }
 ```
 
