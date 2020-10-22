@@ -4,7 +4,7 @@ This is a design draft for the upcoming generic derivation for higher kinded dat
 
 ## Motivation
 
-Having a such datatype definition 
+Having such a datatype definition 
 
 ```scala
 case class Product[F[_]](
@@ -16,23 +16,23 @@ case class Product[F[_]](
 
 one can achieve a lot of helpful things over than just `case class` without `F[_]`, e.g.  
 - original data is restorable as `Product[Id]` 
-- `Product[Option]` could work as functional builder,
+- `Product[Option]` could work as a functional builder,
 - `Product[Either[String, A]]` as a validation result, 
-- `Product[IO]` and `Product[Ref[IO, *]]` could be used as view and state of reactive configuration,
-- `Product[Stream[IO, *]]` could work as reactive dataframe with good types etc. 
+- `Product[IO]` and `Product[Ref[IO, *]]` could be used as a view and state of reactive configuration,
+- `Product[Stream[IO, *]]` could work as a reactive dataframe with good types, etc. 
 
-HKD Patterns should be described in some post in the near future.
+HKD Patterns should be described in some posts soon.
 
 
-Good typeclass equipment is crucial to make the future bright for the HKD. So one need some essential typeclasses and a lot of utilitary typeclasses. Latter means we need some generic derivation library such as magnolia is for simple types.
+A good typeclass equipment is crucial to make the future bright for the HKD. So one needs some essential type classes and a lot of utility type classes. Latter means we need some generic derivation library such as magnolia is for simple types.
 
 ## Essential typeclasses
 
-Several typeclasses may and should be derived for any HKD in the simplest form.
+Several type classes may and should be derived for any HKD in the simplest form.
 
 ### RepresentableK
 
-As for higher kinded traits, HKD could greatly benefit from the representability, having following definitions
+As for higher kinded traits, HKD could greatly benefit from the representability, having the following definitions
 
 ```scala 
 trait FunctionK[-F[_], +G[_]]{
@@ -65,7 +65,7 @@ implicit val productRepresentable: RepresentableK[Product] =
   }
 ```
 
-`RepresentableK[U]` instance means  the type `U`  has `F` effecttively on the "result" positions, i.e. every `U` field or method result is `F[SomeType]` and this is the only place where `F` is met. "effectively" means that some result types or fields could have type `V[F]` where `V` is a representable itself.
+`RepresentableK[U]` instance means the type `U`  has `F` effectively on the "result" positions, i.e. every `U` field or method result is `F[SomeType]` and this is the only place where `F` is met. "effectively" means that some result types or fields could have type `V[F]` where `V` is a representable itself.
 It automatically gives us `Embed`, `FunctorK`, `ApplyK` instances, etc.
 
 Representablity means type could be understood as a large product, but how large - we don't know.
@@ -73,7 +73,7 @@ So we still can have infinite products in form `type U[F] = A => F[SomeType]` wh
 
 ### TraverseK
 
-To limit previous ability we add another typeclass which can not be derived for usual higher kinded traits
+To limit previous ability we add another type class which can not be derived for usual higher kinded traits
 
 ```scala
 trait SequenceK[U[f[_]]] {
@@ -95,11 +95,11 @@ implicit val productSequence: SequenceK[Product] =
   }
 ```
 
-This means we can enumerate all the fields that has `F` in the result.
+This means we can enumerate all the fields that have `F` in the result.
 `SequenceK` still can be defined for constant type constructor such as `type StringT[F[_]] = String` which means that `SequenceK
 
 
-This definition could be combined with `RepresentableK` into powerful single absract method typeclass
+This definition could be combined with `RepresentableK` into a powerful single abstract method type class
 
 ```scala
 trait TraverseK[U[f[_]]] extends RepresentableK[U] with SequenceK[U] {
@@ -114,7 +114,7 @@ trait TraverseK[U[f[_]]] extends RepresentableK[U] with SequenceK[U] {
 }
 ```
 
-Next we again can verify that instance for the `Product` is constructed trivially
+Next, we again can verify that instance for the `Product` is constructed trivially
 
 ```scala
 implicit val productTraverse: TraverseK[Product] =
@@ -131,7 +131,7 @@ implicit val productTraverse: TraverseK[Product] =
 
 ### FieldInfo
 
-Finally we can add typeclasses that has basic description for each field. One possible way is the following
+Finally, we can add type classes that have a basic description for each field. One possible way is the following
 
 ```scala
 case class FieldInfo[A](name: String, annotations: Vector[AnyRef] = Vector.empty)
@@ -139,7 +139,7 @@ case class FieldInfo[A](name: String, annotations: Vector[AnyRef] = Vector.empty
 type HKDInfo[U[f[_]]] = U[FieldInfo]
 ```
 
-Since or datatype has no annotation we can simply name each field to give such instance
+Since or datatype has no annotation we can simply name each field to give such an instance
 
 ```scala
 implicit val productInfo: HKDInfo[Product] = 
@@ -150,18 +150,18 @@ implicit val productInfo: HKDInfo[Product] =
   ).mapK(funK(s => FieldInfo(s)))
 ```
 
-We desire that all `HKDInfo` and `TraverseK` would be derived by some macro, preferrably using macro-annotations
+We desire that all `HKDInfo` and `TraverseK` would be derived by some macro, preferably using macro-annotations
 
 ## Utility typeclasses
 
-Magnolia is great for simple cases, but it's internal mechanics is too advanced to support automatic derivation, while we'd like to support only semi-automatic.
+Magnolia is great for simple cases, but its internal mechanics are too advanced to support automatic derivation, while we'd like to support only semi-automatic.
 Magnolia has several shortcomings:
 
-- Each derivation requires exactly the same typeclass for each field type
+- Each derivation requires the same typeclass for each field type
 - There is no ability not to require typeclass instance, based on the annotation
-- It has no ability to support higher kinded types
+- It cannot support higher kinded types
 - It has some issues with cross-recursive data types
-- It provide some typesafety, but it's limited and most of useful typeclasses requires unsafe uperations on `Any` instances
+- It provides some type safety, but it's limited and most of the useful typeclasses require unsafe operations on `Any` instances
 
 Hence we decide to provide alternative derivation mechanics, exploiting HKD ability to describe itself.
 
@@ -173,8 +173,8 @@ trait HKDDerivation[TC[u[f[_]]], Field[_]] {
   def deriveWith[U[f[_]]](instances: => U[Field])(implicit traverse: TraverseK[U], info: HKDInfo[U]): TC[U]
 }
 ```
-Here our provider would require `Field` typeclass for each of field type. 
-Whole pack of `Field` instances will be assembled into the `U[Field]` value and provided to our provider.
+Here our provider would require a `Field` typeclass for each of field type. 
+The whole pack of `Field` instances will be assembled into the `U[Field]` value and provided to our provider.
 Note that instances are passed by name which allows for complex recursion forms.
 Moreover, the provider may require basic `TraverseK` and `HKDInfo` instances as they should be generated for each HKD definition in the first place.
 
@@ -185,14 +185,14 @@ Macro for the derivation would have the following signature
 def deriveInstance[U[f[_]], TC[u[f[_]]], Field[_]](derivator: HKDDerivation[TC, Field]): TC[U] = macro ...
 ```
 
-This macro function will be provided by the library, so users wont need to define their own macros for each typeclass.
+This macro function will be provided by the library, so users won't need to define their macros for each typeclass.
 The code generated would be extremely simple. Let's imagine we have such typeclass 
 ```scala
 trait HKDIdShow[U[f[_]]] {
   def encode(uid: U[Id]): String
 }
 ``` 
-which is simplest form of show
+which is the simplest form of show
 
 invocation of `deriveInstance[Product, HKDIdShow, Show]` will produce an equivalent of the following definition
 
@@ -212,7 +212,7 @@ This code will require `Show` for each instance, also `TraverseK` and `FieldInfo
 ### Case Study: JSON
 
 Let's imagine how `Decoder` and `Encoder` providers should look for us
-We'll try to achive the complex task: derive codec for `HKD[F]` whenever `F` itself can reprovide the codec.
+We'll try to achieve the complex task: derive codec for `HKD[F]` whenever `F` itself can provide the codec.
 
 We'll start from the typeclasses for such reprovision
 
@@ -251,7 +251,7 @@ trait HKDDecoder[U[f[_]]] {
 }
 ```
 
-Another obvous pattern and another generalization
+Another obvious pattern and another generalization
 
 ```scala
 trait WrapHKD[U[f[_]], TC[_]]{
@@ -316,11 +316,11 @@ implicit val hkdDecoderDerive: HKDDerivation[HKDDecoder, Decoder] =
   }
   ```
 
-These definitions looks like big onions - three anonymous classes inside each other.
-Still, it's interesting how everything needed to final encoding, decoding is getting to the scope step by step.
-And the most elegance of such approach is how there is no need for unsafe operations. 
-Every step is full typechecked and you can write, guided by types.
+These definitions look like big onions - three anonymous classes inside each other.
+Still, it's interesting how everything is needed for final encoding, decoding is getting to the scope step by step.
+And the elegance of such an approach is how there is no need for unsafe operations. 
+Every step is full type-checked and you can write, guided by types.
 
-These vals are replacement for magnolias `combine` method, but they are fully checked for compatibility before your user will try to derive any instance, since they are merely trait implementations.
+These values are replacement for magnolias `combine` method, but they are fully checked for compatibility before your user will try to derive any instance since they are merely trait implementations.
 
 
