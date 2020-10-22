@@ -96,7 +96,7 @@ implicit val productSequence: SequenceK[Product] =
 ```
 
 This means we can enumerate all the fields that have `F` in the result.
-`SequenceK` still can be defined for constant type constructor such as `type StringT[F[_]] = String` which means that `SequenceK
+`SequenceK` still can be defined for constant type constructor such as `type StringT[F[_]] = String` which means that `SequenceK` allows fields that are not wrapped in `F`.
 
 
 This definition could be combined with `RepresentableK` into a powerful single abstract method type class
