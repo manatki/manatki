@@ -6,7 +6,7 @@ import ProCorep.ops._
 object ListPApp extends App {
 
   val largeList = ListP(1L to 100000L: _*)
-  val sum = new ListP[Long, Long, Long] {
+  val sum       = new ListP[Long, Long, Long] {
     def nil                    = 0
     def cons(a: Long, y: Long) = a + y
   }
@@ -15,7 +15,12 @@ object ListPApp extends App {
     def cons(a: A, y: List[A]) = a :: y
   }
 
-//  println(largeList.foldL(sum).value)
+  type IntList[-A, +B] = ListP[Long, A, B]
+  val lst = ProCorep.construct[IntList]
+  val x   = Layer[IntList](_.nil)
+  val x1 = lst.cons(1, lst.cons(2, lst.nil))
+  println(x1.fold(sum))
+  // println(largeList.foldL(sum).value)
 //  println(largeList.foldL(toList).value)
-  println(largeList.map(_ + 1).foldL(sum.zip(toList[Long])).value)
+  // println(largeList.map(_ + 1).foldL(sum.zip(toList[Long])).value)
 }

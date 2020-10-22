@@ -34,7 +34,7 @@ object ProCorepK {
     P.tabulateK(k)
 
   def constructK[P[-_[_], +_[_]]: ProCorepK]: P[Platform[P, *], Platform[P, *]] =
-    tabulateK[P, Platform[P, *], Platform[P, *]](funK(_(constructK)))
+    tabulateK[P, Platform[P, *], Platform[P, *]](funK(f => Platform[P](f(_))))
 }
 
 @typeclass

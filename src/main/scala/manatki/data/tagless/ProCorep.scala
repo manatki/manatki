@@ -69,7 +69,7 @@ trait Representable[F[_]] extends Monad[F] with ProCorep[λ[(a, b) => F[b]]] {
     }
     tabulate(go(a))
   }
-  override def pure[A](x: A): F[A] = tabulate(_ => x)
+  override def pure[A](x: A): F[A]                         = tabulate(_ => x)
 }
 
 object Representable {
@@ -94,7 +94,7 @@ trait ProCorep[P[_, _]] extends Pro[P] {
 
   def constant[A, B](b: B): P[A, B] = cotabulate(_ => b)
 
-  def construct[Q[-x, y] <: P[x, y] @uv]: P[Layer[Q], Layer[Q]] = cotabulate(_(construct))
+  def construct[Q[-x, y] <: P[x, y] @uv]: P[Layer[Q], Layer[Q]] = cotabulate(f => Layer[Q](f(_)))
 
 }
 
@@ -103,7 +103,7 @@ object ProCorep {
 
   class LMap[A, B, C, P[_, _]](val pab: P[A, B], val f: C => A)
 
-  def construct[P[-_, _]](implicit P: ProCorep[P]): P[Layer[P], Layer[P]] = P.construct[P]
+  def construct[P[-_, _]](implicit P: ProCorep[P]): P[Layer[P], Layer[P]] = P.construct
 }
 
 @typeclass

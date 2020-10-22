@@ -1,9 +1,9 @@
 object Version {
-  val cats = "2.1.0"
+  val cats = "2.2.0"
 
   val shapeless = "2.3.3"
 
-  val catsEffect = "2.0.0"
+  val catsEffect = "2.2.0"
 
   val catsMtl = "0.7.0"
 
