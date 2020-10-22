@@ -19,7 +19,8 @@ one can achieve a lot of helpful things over than just `case class` without `F[_
 - `Product[Option]` could work as a functional builder,
 - `Product[Either[String, A]]` as a validation result, 
 - `Product[IO]` and `Product[Ref[IO, *]]` could be used as a view and state of reactive configuration,
-- `Product[Stream[IO, *]]` could work as a reactive dataframe with good types, etc. 
+- `Product[Stream[IO, *]]` could work as a reactive dataframe with good types
+- many others... 
 
 HKD Patterns should be described in some posts soon.
 
@@ -236,7 +237,7 @@ type EncoderK[F[_]] = WrapInstance[F, Encoder]
 type DecoderK[F[_]] = WrapInstance[F, Encoder]
 ```
 
-These instances could be defined for all the standard containers: `Option`, `List`, `Either[E, *`] where `E` has Codec, etc...
+These instances could be defined for all the standard containers: `Option`, `List`, `Either[E, *`] where `E` has Codec, and other simple containers
 
 Now we can define our typeclasses
 
@@ -263,7 +264,7 @@ type HKDEncoder[U[f[_]]] = WrapHKD[U, Encoder]
 type HKDDecoder[U[f[_]]] = WrapHKD[U, Decoder]
 ```
 
-So having `HKDEncoder` and `HKDDecoder` for `Product` means we automatically get `Encoder` and `Decoder` for `Product[Id]`, `Product[Option]`, `Product[Either[String,*]]`, `Product[Vector]`, etc...
+So having `HKDEncoder` and `HKDDecoder` for `Product` means we automatically get `Encoder` and `Decoder` for `Product[Id]`, `Product[Option]`, `Product[Either[String,*]]`, `Product[Vector]`, etc.
 
 The only step is writing providers for such typeclasses using our previous abstraction `HKDDerivation`
 
@@ -294,7 +295,7 @@ implicit val hkdEncoderDerive: HKDDerivation[HKDEncoder, Encoder] =
   }
 ```
 
-and the encoder
+and the decoder
 ```scala
 implicit val hkdDecoderDerive: HKDDerivation[HKDDecoder, Decoder] =
   new HKDDerivation[HKDDecoder, Decoder] {
