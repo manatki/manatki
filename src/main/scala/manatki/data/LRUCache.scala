@@ -14,7 +14,7 @@ import scala.annotation.tailrec
   */
 case class LRUCache[K, +V] private (
     q: Vector[K],
-    cache: Map[K, (Long, V)],
+    cache: Map[K, (Int, V)],
     lim: Int
 ) {
 
@@ -24,7 +24,7 @@ case class LRUCache[K, +V] private (
   /** put new value to the cache */
   def put[V1 >: V](k: K, v: V1): LRUCache[K, V1] =
     cache.get(k) match {
-      case None          => copy(q = q :+ k, cache = cache.updated(k, (0L, v))).fix
+      case None          => copy(q = q :+ k, cache = cache.updated(k, (0, v))).fix
       case Some((rc, v)) => copy(cache = cache.updated(k, (rc + 1, v)))
     }
 
@@ -38,7 +38,7 @@ case class LRUCache[K, +V] private (
       case k +: rest =>
         cache(k) match {
           case (0, _)  => copy(q = rest, cache = cache - k).fix
-          case (rc, v) => copy(q = rest :+ k, cache = cache.updated(k, (rc - 1L, v))).fix
+          case (rc, v) => copy(q = rest :+ k, cache = cache.updated(k, (rc - 1, v))).fix
         }
       case _         => this
     }
