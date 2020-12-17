@@ -37,7 +37,7 @@ case class LRUCache[K, +V] private (
     q match {
       case k +: rest =>
         cache(k) match {
-          case (0, _)  => copy(q = rest, cache = cache - k)
+          case (0, _)  => copy(q = rest, cache = cache - k).fix
           case (rc, v) => copy(q = rest :+ k, cache = cache.updated(k, (rc - 1L, v))).fix
         }
       case _         => this
