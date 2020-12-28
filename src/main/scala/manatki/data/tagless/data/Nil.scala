@@ -1,8 +1,7 @@
 package manatki.data.tagless
 package data
 import cats.Applicative
-import manatki.data.tagless.ProCorep.{LMap, Tab}
-import manatki.data.tagless.ProTraverse.ProTrav
+import manatki.data.tagless.ProTraverse.Tab
 import tofu.syntax.monadic._
 
 trait Nil[+O] {
@@ -14,26 +13,13 @@ object Nil extends Layer[λ[(`-a`, `+b`) => Nil[b]]] {
 
   type NP[-a, +b] = Nil[b]
 
-  trait Tabulate[A, B, P[-x, +y] <: Nil[y]] extends Tab[A, B, P] with Nil[B] {
-    def nil: B = k(Rep.pro[P, A](_.nil))
-  }
-
-  trait LeftMap[A, B, C, P[-x, +y] <: Nil[y]] extends LMap[A, B, C, P] with Nil[B] {
-    def nil: B = pab.nil
-  }
-
-  trait Trav[F[_], A, B, P[-x, +y] <: Nil[y]] extends ProTrav[F, A, B, P] with Nil[F[B]] {
-    def nil: F[B] = pab.nil.pure[F]
+  trait TabTraverse[F[_], A, B, C, P[-x, +y] <: Nil[y]] extends Tab[F, A, B, C, P] with Nil[C] {
+    def nil: C = right(F.pure(rep(_.nil)))
   }
 
   implicit val corepresentable: ProTraverse[NP] = new ProTraverse[NP] {
-    def cotabulate[A, B](k: Rep[Nil] => B): Nil[B] =
-      new Tab[A, B, NP](k) with Tabulate[A, B, NP]
-
-    def lmap[A, B, C](fab: Nil[B])(f: C => A): Nil[B] = fab
-
-    def protraverse[F[_]: Applicative, A, B](p: NP[A, B]): NP[F[A], F[B]] =
-      new ProTrav[F, A, B, NP](p) with Trav[F, A, B, NP]
+    def tabTraverse[F[_] : Applicative, A, B, C](left: A => F[B])(right: F[PR[B]] => C): NP[A, C] =
+      new Tab(left, right) with TabTraverse[F, A, B, C, NP]
   }
 
 }

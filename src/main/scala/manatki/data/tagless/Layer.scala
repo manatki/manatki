@@ -48,7 +48,8 @@ object Layer {
     def foldEval[A](p: P[Eval[A], Eval[A]])(implicit P: Pro[P]): Eval[A] =
       layer.unpack(P.lmap(p)(x => Eval.defer(x.foldEval(p))))
 
-    def foldL[A](p: P[A, A])(implicit P: ProTraverse[P]): Eval[A] = layer.foldEval(P.protraverse(p))
+    def foldL[A](p: P[A, A])(implicit P: ProTraverse[P]): Eval[A] = layer.foldEval(P.prosequence(p))
+    def foldS[A](p: P[A, A])(implicit P: ProTraverse[P]): A = layer.foldEval(P.prosequence(p)).value
 
     def para[A](p: P[(A, Layer[P]), A])(implicit P: ProCorep[P]): A =
       layer.unpack(P.lmap(p)(la => (la.para(p), la)))
@@ -56,7 +57,7 @@ object Layer {
     def paraEval[A](p: P[(Eval[A], Layer[P]), Eval[A]])(implicit P: ProCorep[P]): Eval[A] =
       layer.unpack(P.lmap(p)(la => (Eval.defer(la.paraEval(p)), la)))
 
-    def paraL[A](p: P[(A, Layer[P]), A])(implicit P: ProTraverse[P]): Eval[A] = paraEvalT[P, A](layer, P.protraverse(p))
+    def paraL[A](p: P[(A, Layer[P]), A])(implicit P: ProTraverse[P]): Eval[A] = paraEvalT[P, A](layer, P.prosequence(p))
 
     def prepro[A](f: FunK2[P, P])(p: P[A, A])(implicit P: LMap[P]): A = layer.unpack(f(P.lmap(p)(_.prepro(f)(p))))
 
@@ -64,7 +65,7 @@ object Layer {
       layer.unpack(f(P.lmap(p)(x => Eval.defer(x.preproEval(f)(p)))))
 
     def preproL[A](f: FunK2[P, P])(p: P[A, A])(implicit P: ProTraverse[P]): Eval[A] =
-      layer.preproEval(f)(P.protraverse(p))
+      layer.preproEval(f)(P.prosequence(p))
 
     def histo[A](p: P[CofreeP[P, A], A])(implicit P: ProCorep[P]): A = gfold(cofreeDist)(p)
 
@@ -123,7 +124,7 @@ object GBuilder {
     def hyloEval[B](p: P[Eval[B], Eval[B]])(a: A)(implicit P: LMap[P]): Eval[B] =
       builder.continue(a, P.lmap(p)(ea => Eval.defer(hyloEval(p)(ea))))
 
-    def hyloL[B](p: P[B, B])(a: A)(implicit P: ProTraverse[P]): Eval[B] = hyloEval(P.protraverse(p))(a)
+    def hyloL[B](p: P[B, B])(a: A)(implicit P: ProTraverse[P]): Eval[B] = hyloEval(P.prosequence(p))(a)
   }
 
   implicit class BuilderApoOps[P[-_, _], A](private val builder: Builder[P, LayerOr[P, A]]) extends AnyVal {

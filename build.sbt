@@ -78,4 +78,7 @@ testSettings
 
 libraryDependencies ++= akkas.map(_ % "test")
 
+libraryDependencies += "org.scalameta" %% "munit" % "0.7.20" % Test
+
+
 libraryDependencies += "org.typelevel" %% "discipline-core" % Version.discipline

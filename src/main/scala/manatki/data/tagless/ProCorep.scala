@@ -1,11 +1,10 @@
 package manatki.data.tagless
-import cats.arrow.Profunctor
-import cats.{Applicative, Functor, Monad, Traverse}
+import cats.{Applicative, Functor, Id, Monad}
 import manatki.data.tagless.Rep.prof
 import simulacrum.typeclass
-import scala.annotation.unchecked.{uncheckedVariance => uv}
 
 import scala.annotation.tailrec
+import scala.annotation.unchecked.{uncheckedVariance => uv}
 
 trait Rep[-F[_]] extends Layer[λ[(`-a`, `b`) => F[b]]] {
   def apply[R](fa: F[R]): R
@@ -78,6 +77,8 @@ object Representable {
 
 @typeclass
 trait ProCorep[P[_, _]] extends Pro[P] {
+  type PR[A] = Rep[P[A, *]]
+
   def cotabulate[A, B](k: Rep[P[A, *]] => B): P[A, B]
 
   override def rmap[A, B, C](fab: P[A, B])(f: B => C): P[A, C] = cotabulate(rep => f(rep(fab)))
@@ -99,23 +100,49 @@ trait ProCorep[P[_, _]] extends Pro[P] {
 }
 
 object ProCorep {
-  class Tab[A, B, P[_, _]](val k: Rep[P[A, *]] => B)
-
-  class LMap[A, B, C, P[_, _]](val pab: P[A, B], val f: C => A)
-
   def construct[P[-_, _]](implicit P: ProCorep[P]): P[Layer[P], Layer[P]] = P.construct
 }
 
 @typeclass
 trait ProTraverse[P[_, _]] extends ProCorep[P] {
-  def protraverse[F[_]: Applicative, A, B](p: P[A, B]): P[F[A], F[B]]
+  def prosequence[F[_], A, B](p: P[A, B])(implicit F: Applicative[F]): P[F[A], F[B]] =
+    tabTraverse[F, F[A], A, F[B]](identity)(F.map(_)(_(p)))
+
+  override def cotabulate[A, B](k: PR[A] => B): P[A, B] =
+    tabTraverse[Id, A, A, B](identity)(k)
+
+  override def lmap[A, B, C](fab: P[A, B])(f: C => A): P[C, B] =
+    tabTraverse[Id, C, A, B](f)(_(fab))
+
+  def tabTraverse[F[_]: Applicative, A, B, C](left: A => F[B])(right: F[PR[B]] => C): P[A, C]
 }
 
 object ProTraverse {
-  trait ByTraverse[P[_, _]] extends ProTraverse[P] with Traverse[Rep.prof[P, *]] {
-    def protraverse[F[_], A, B](p: P[A, B])(implicit F: Applicative[F]): P[F[A], F[B]] =
-      cotabulate(rep => F.map(sequence[F, A](rep))(_(p)))
+
+  class Tab[F[_], A, B, C, P[-_, _]](val left: A => F[B], val right: F[Rep[P[B, *]]] => C)(implicit
+      val F: Applicative[F]
+  ) {
+    final def rep = Rep.pro[P, B]
   }
 
-  class ProTrav[F[_], A, B, P[-_, _]](val pab: P[A, B])(implicit val F: Applicative[F])
+  def make[P[-_, _]] = new Maker[P]
+
+  class Maker[P[-_, _]] {
+    type Fa[_]
+    type Aa
+    type Ba
+    type Ca
+    def apply(instance: Applied[Fa, Aa, Ba, Ca, P]): ProTraverse[P] = instance
+  }
+
+  abstract class Applied[Fa[_], Aa, Ba, Ca, P[-_, _]] extends ProTraverse[P] {
+    def tabTravArb(left: Aa => Fa[Ba])(right: Fa[Rep[P[Ba, *]]] => Ca)(F: Applicative[Fa]): P[Aa, Ca]
+
+    override def tabTraverse[F[_], A, B, C](left: A => F[B])(right: F[Rep[P[B, *]]] => C)(implicit
+        F: Applicative[F]
+    ): P[A, C] =
+      tabTravArb(left.asInstanceOf[Aa => Fa[Ba]])(right.asInstanceOf[Fa[Rep[P[Ba, *]]] => Ca])(
+        F.asInstanceOf[Applicative[Fa]]
+      ).asInstanceOf[P[A, C]]
+  }
 }
