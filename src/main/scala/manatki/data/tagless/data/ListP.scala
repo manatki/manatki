@@ -1,5 +1,6 @@
 package manatki.data.tagless.data
 import cats.syntax.show._
+import cats.tagless.autoFunctorK
 import cats.{Applicative, Functor, Show}
 import derevo.derive
 import manatki.data.tagless.ProTraverse.Tab
@@ -24,7 +25,7 @@ object ListP extends ProfData1[ListP] {
     def toList: F[List[A]]
   }
 
-  implicit def rep[A]: RepresentableK[FoldOps[A, *[_]]] = representableK.instance
+  implicit def opsFunctor[A] = representableK.instance
 
   def foldOps[A] = new FoldOps[A, Fold[A, *]] {
     override def sum(implicit A: Numeric[A]) = new Fold[A, A] {

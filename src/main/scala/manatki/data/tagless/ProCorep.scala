@@ -96,7 +96,6 @@ trait ProCorep[P[_, _]] extends Pro[P] {
   def constant[A, B](b: B): P[A, B] = cotabulate(_ => b)
 
   def construct[Q[-x, y] <: P[x, y] @uv]: P[Layer[Q], Layer[Q]] = cotabulate(f => Layer[Q](f(_)))
-
 }
 
 object ProCorep {
@@ -117,7 +116,7 @@ trait ProTraverse[P[_, _]] extends ProCorep[P] {
   def tabTraverse[F[_]: Applicative, A, B, C](left: A => F[B])(right: F[PR[B]] => C): P[A, C]
 }
 
-object ProTraverse {
+object ProTraverse extends ProTraverseInstances {
 
   class Tab[F[_], A, B, C, P[-_, _]](val left: A => F[B], val right: F[Rep[P[B, *]]] => C)(implicit
       val F: Applicative[F]
@@ -145,4 +144,26 @@ object ProTraverse {
         F.asInstanceOf[Applicative[Fa]]
       ).asInstanceOf[P[A, C]]
   }
+}
+
+class ProTraverseInstances {
+  import tofu.syntax.monadic._
+  type Extend1[X1, P[-i, +o], -I, +O]     = P[I, X1 => O]
+  type Extend2[X1, X2, P[-i, +o], -I, +O] = P[I, (X1, X2) => O]
+
+  final implicit def extend1[X1, P[-i, +o]](implicit pt: ProTraverse[P]): ProTraverse[Extend1[X1, P, -*, +*]] =
+    new ProTraverse[Extend1[X1, P, -*, +*]] {
+      def tabTraverse[F[_]: Applicative, A, B, C](left: A => F[B])(right: F[PR[B]] => C): P[A, X1 => C] =
+        pt.tabTraverse[F, A, B, X1 => C](left)(fpr =>
+          x1 => right(fpr.map(r => Rep.pro[Extend1[X1, P, -*, +*], B](p => r(p)(x1))))
+        )
+    }
+
+  final implicit def extend2[X1, X2, P[-i, +o]](implicit pt: ProTraverse[P]): ProTraverse[Extend2[X1, X2, P, -*, +*]] =
+    new ProTraverse[Extend2[X1, X2, P, -*, +*]] {
+      def tabTraverse[F[_]: Applicative, A, B, C](left: A => F[B])(right: F[PR[B]] => C): P[A, (X1, X2) => C] =
+        pt.tabTraverse[F, A, B, (X1, X2) => C](left)(fpr =>
+          (x1, x2) => right(fpr.map(r => Rep.pro[Extend2[X1, X2, P, -*, +*], B](p => r(p)(x1, x2))))
+        )
+    }
 }

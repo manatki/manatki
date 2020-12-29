@@ -6,7 +6,7 @@ import ProCorep.ops._
 class ListPSuite extends munit.FunSuite {
 
   val largeList = ListP(1L to 100_000L: _*)
-  val ops = ListP.foldOps[Long]
+  val ops       = ListP.foldOps[Long]
 
   type IntList[-A, +B] = ListP[Long, A, B]
   val lst       = ProCorep.construct[IntList]

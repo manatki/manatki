@@ -2,7 +2,7 @@ package manatki.data.tagless
 
 import cats.syntax.coflatMap._
 import cats.syntax.comonad._
-import cats.{Comonad, Eval, Id, Monad, StackSafeMonad}
+import cats.{Comonad, Defer, Eval, Id, Monad, StackSafeMonad}
 import manatki.data.tagless.PTrans.PTag
 import tofu.syntax.monadic._
 import cats.syntax.either._
@@ -45,10 +45,16 @@ object Layer {
       layer.unpack(go).extract.apply(p)
     }
 
-    def foldEval[A](p: P[Eval[A], Eval[A]])(implicit P: Pro[P]): Eval[A] =
-      layer.unpack(P.lmap(p)(x => Eval.defer(x.foldEval(p))))
+    def foldEval[A](p: P[Eval[A], Eval[A]])(implicit P: Pro[P]): Eval[A] = foldDefer(p)
+
+    def foldDefer[F[_], A](p: P[F[A], F[A]])(implicit P: Pro[P], F: Defer[F]): F[A] =
+      layer.unpack(P.lmap(p)(x => F.defer(x.foldDefer(p))))
 
     def foldL[A](p: P[A, A])(implicit P: ProTraverse[P]): Eval[A] = layer.foldEval(P.prosequence(p))
+
+    def foldM[F[_]: Monad: Defer, A](p: P[A, F[A]])(implicit P: ProTraverse[P]): F[A] =
+      layer.foldDefer(P.tabTraverse(identity[F[A]])(_.flatMap(_(p))))
+
     def foldS[A](p: P[A, A])(implicit P: ProTraverse[P]): A = layer.foldEval(P.prosequence(p)).value
 
     def para[A](p: P[(A, Layer[P]), A])(implicit P: ProCorep[P]): A =
@@ -82,7 +88,7 @@ object Layer {
     def pdist[A]: P[CofreeP[P, A], CofreeP[P, Rep[P[A, *]]]] =
       P.cotabulate { rep =>
         new CofreeP[P, Rep[P[A, *]]] {
-          def value: Rep[P[A, *]] = rep.pmap(_.value)
+          def value: Rep[P[A, *]]                             = rep.pmap(_.value)
           def unpack[R](p: P[CofreeP[P, Rep[P[A, *]]], R]): R =
             rep(P.lmap(p)(_.unpack(pdist)))
         }
@@ -90,8 +96,8 @@ object Layer {
     PDistr[P, CofreeP[P, *]](pdist)
   }
 
-  private def paraEvalT[P[-_, _], A](l: Layer[P], p: P[Eval[(A, Layer[P])], Eval[A]])(
-      implicit P: ProCorep[P]
+  private def paraEvalT[P[-_, _], A](l: Layer[P], p: P[Eval[(A, Layer[P])], Eval[A]])(implicit
+      P: ProCorep[P]
   ): Eval[A] =
     l.unpack(P.lmap(p)(la => Eval.defer(paraEvalT(la, p).tupleRight(la))))
 
@@ -108,7 +114,7 @@ trait GBuilder[-P[_, _], F[_], A] { self =>
 
 object GBuilder {
   implicit class BuilderUnfoldOpsC[P[-_, _], A](private val builder: Builder[P, A]) extends AnyVal {
-    def unfold(init: A)(implicit P: LMap[P]): Layer[P] =
+    def unfold(init: A)(implicit P: LMap[P]): Layer[P]                  =
       new Layer[P] {
         def unpack[B](p: P[Layer[P], B]): B =
           builder.continue(init, P.lmap(p)(unfold(_)))
@@ -118,7 +124,7 @@ object GBuilder {
         builder.continue(init, f(P.lmap(p)(postpro(f)(_))))
     }
   }
-  implicit class BuilderUnfoldOps[P[_, _], A](private val builder: Builder[P, A]) extends AnyVal {
+  implicit class BuilderUnfoldOps[P[_, _], A](private val builder: Builder[P, A])   extends AnyVal {
     def hylo[B](p: P[B, B])(a: A)(implicit P: LMap[P]): B = builder.continue(a, P.lmap(p)(hylo(p)))
 
     def hyloEval[B](p: P[Eval[B], Eval[B]])(a: A)(implicit P: LMap[P]): Eval[B] =
@@ -131,10 +137,13 @@ object GBuilder {
     def apo(init: A)(implicit P: LMap[P]): Layer[P] =
       new Layer[P] {
         def unpack[B](p: P[Layer[P], B]): B =
-          builder(LayerVal(init), P.lmap(p) {
-            case l: Layer[P] => l
-            case LayerVal(a) => apo(a)
-          })
+          builder(
+            LayerVal(init),
+            P.lmap(p) {
+              case l: Layer[P] => l
+              case LayerVal(a) => apo(a)
+            }
+          )
       }
   }
 
@@ -210,16 +219,16 @@ object CofreeP {
 
   implicit def cofreeInstance[P[-_, _]](implicit P: LMap[P]): Comonad[CofreeP[P, *]] =
     new Comonad[CofreeP[P, *]] {
-      def extract[A](x: CofreeP[P, A]): A = x.value
+      def extract[A](x: CofreeP[P, A]): A                                          = x.value
       def coflatMap[A, B](fa: CofreeP[P, A])(f: CofreeP[P, A] => B): CofreeP[P, B] =
         new CofreeP[P, B] {
-          def value: B = f(fa)
+          def value: B                             = f(fa)
           def unpack[R](p: P[CofreeP[P, B], R]): R =
             fa.unpack(P.lmap(p)(coflatMap(_)(f)))
         }
-      def map[A, B](fa: CofreeP[P, A])(f: A => B): CofreeP[P, B] =
+      def map[A, B](fa: CofreeP[P, A])(f: A => B): CofreeP[P, B]                   =
         new CofreeP[P, B] {
-          def value: B = f(fa.value)
+          def value: B                             = f(fa.value)
           def unpack[R](p: P[CofreeP[P, B], R]): R =
             fa.unpack(P.lmap(p)(map(_)(f)))
         }
@@ -263,7 +272,7 @@ object FreeP {
         def unpack[R](pf: P[FreeP[P, B], R])(br: B => R): R =
           fa.unpack(P.lmap(pf)(flatMap(_)(f)))(f(_).unpack(pf)(br))
       }
-      def pure[A](x: A): FreeP[P, A] = FreeP.pure(x)
+      def pure[A](x: A): FreeP[P, A]                                       = FreeP.pure(x)
     }
 }
 
@@ -281,8 +290,8 @@ object FreerP {
     def continue(pin: X): FreerP[P, A]
     def flatMap[Q[i, o] <: P[i, o], B](f: A => FreerP[Q, B]): Bind[Q, X, B] =
       new Bind[Q, X, B] {
-        def rep[R](pr: Q[X, R]): R         = self.rep(pr)
-        def continue(pin: X): FreerP[Q, B] = self.continue(pin).flatMap(f)
+        def rep[R](pr: Q[X, R]): R                                                       = self.rep(pr)
+        def continue(pin: X): FreerP[Q, B]                                               = self.continue(pin).flatMap(f)
         override def flatMap[U[i, o] <: Q[i, o], C](g: B => FreerP[U, C]): Bind[U, X, C] =
           self.flatMap(a => f(a).flatMap(g))
       }
