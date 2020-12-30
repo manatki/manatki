@@ -1,25 +1,50 @@
 package manatki.data.tagless
-import cats.{Applicative, Functor, Id, Monad}
-import manatki.data.tagless.Rep.prof
+import cats.{Applicative, Functor, Id}
 import simulacrum.typeclass
 
-import scala.annotation.tailrec
 import scala.annotation.unchecked.{uncheckedVariance => uv}
 
-trait Rep[-F[_]] extends Layer[λ[(`-a`, `b`) => F[b]]] {
-  def apply[R](fa: F[R]): R
+trait Rep[-P[_, _], A] {
+  def apply[R](fa: P[A, R]): R
+}
 
-  override def unpack[R](p: F[R]): R = apply(p)
+@typeclass trait PBase[P[_, _]]
+object PBase {
+  import tofu.syntax.monadic._
+  type Extend1[X1, P[-i, +o], -I, +O]     = P[I, X1 => O]
+  type Extend2[X1, X2, P[-i, +o], -I, +O] = P[I, (X1, X2) => O]
+
+  final implicit def extend1[X1, P[-i, +o]](implicit pt: ProTraverse[P]): ProTraverse[Extend1[X1, P, -*, +*]] =
+    new ProTraverse[Extend1[X1, P, -*, +*]] {
+      def tabTraverse[F[_]: Applicative, A, B, C](
+          left: A => F[B]
+      )(right: F[Rep[Extend1[X1, P, -*, +*], B]] => C): P[A, X1 => C] =
+        pt.tabTraverse[F, A, B, X1 => C](left)(fpr =>
+          x1 => right(fpr.map(r => Rep[Extend1[X1, P, -*, +*], B](p => r(p)(x1))))
+        )
+    }
+
+  final implicit def extend2[X1, X2, P[-i, +o]](implicit pt: ProTraverse[P]): ProTraverse[Extend2[X1, X2, P, -*, +*]] =
+    new ProTraverse[Extend2[X1, X2, P, -*, +*]] {
+      def tabTraverse[F[_]: Applicative, A, B, C](
+          left: A => F[B]
+      )(right: F[PR[B]] => C): P[A, (X1, X2) => C] =
+        pt.tabTraverse[F, A, B, (X1, X2) => C](left)(fpr =>
+          (x1, x2) => right(fpr.map(r => Rep[Extend2[X1, X2, P, -*, +*], B](p => r(p)(x1, x2))))
+        )
+    }
 }
 
 @typeclass
-trait LMap[P[_, _]] {
+trait LMap[P[_, _]] extends PBase[P] {
   def lmap[A, B, C](fab: P[A, B])(f: C => A): P[C, B]
 }
 
-@typeclass trait RMap[P[_, _]] {
+@typeclass trait RMap[P[_, _]] extends PBase[P] {
   def rmap[A, B, C](fab: P[A, B])(f: B => C): P[A, C]
 
+  final def flipOut[A, X1, R](f: P[A, X1 => R])(x1: X1): P[A, R]                    = rmap(f)(_(x1))
+  final def flipOut2[A, X1, X2, R](f: P[A, (X1, X2) => R])(x1: X1, x2: X2): P[A, R] = rmap(f)(_(x1, x2))
 }
 
 @typeclass
@@ -28,58 +53,34 @@ trait Pro[P[_, _]] extends LMap[P] with RMap[P] { self =>
 }
 
 object Rep {
-  type prof[-P[a, b], A] = Rep[P[A, *]]
+  def apply[P[-_, _], A] = new Applied[P, A](true)
+  def mk[P[-_, _], A]    = new Applied[P, A](true)
 
-  def apply[U[_]]     = new Applied[U](true)
-  def mk[U[_]]        = new Applied[U](true)
-  def pro[P[_, _], A] = new Applied[P[A, *]](true)
-
-  class Applied[T[_]](private val __ : Boolean) extends AnyVal {
+  class Applied[P[-_, _], A](private val __ : Boolean) extends AnyVal {
     type Arb
-    def apply(maker: MakeRepr[T, Arb]): Rep[T] = maker
+    def apply(maker: MakeRepr[P, A, Arb]): Rep[P, A] = maker
   }
 
-  abstract class MakeRepr[T[_], Arb] extends Rep[T] {
-    def applyArbitrary(fk: T[Arb]): Arb
+  abstract class MakeRepr[P[-_, _], A, Arb] extends Rep[P, A] {
+    def applyArbitrary(fk: P[A, Arb]): Arb
 
-    def apply[R](fk: T[R]): R = applyArbitrary(fk.asInstanceOf[T[Arb]]).asInstanceOf[R]
+    def apply[R](fk: P[A, R]): R = applyArbitrary(fk.asInstanceOf[P[A, Arb]]).asInstanceOf[R]
   }
 
-  implicit def prorepFunctor[P[_, _]](implicit P: Pro[P]): Functor[prof[P, *]] = new Functor[prof[P, *]] {
-    def map[A, B](fa: prof[P, A])(f: A => B): prof[P, B] = Rep.pro[P, B](p => fa(P.lmap(p)(f)))
+  implicit def prorepFunctor[P[-_, _]](implicit P: Pro[P]): Functor[Rep[P, *]] = new Functor[Rep[P, *]] {
+    def map[A, B](fa: Rep[P, A])(f: A => B): Rep[P, B] = Rep[P, B](p => fa(P.lmap(p)(f)))
   }
 
-  implicit class ProfRepOps[P[-_, _], A](private val self: Rep[P[A, *]]) extends AnyVal {
-    def pmap[B](f: A => B)(implicit P: Pro[P]): Rep[P[B, *]] = Rep.pro[P, B](p => self(P.lmap(p)(f)))
+  implicit class ProfRepOps[P[-_, _], A](private val self: Rep[P, A]) extends AnyVal {
+    def pmap[B](f: A => B)(implicit P: Pro[P]): Rep[P, B] = Rep[P, B](p => self(P.lmap(p)(f)))
   }
-}
-
-trait Representable[F[_]] extends Monad[F] with ProCorep[λ[(a, b) => F[b]]] {
-  def tabulate[A](fa: Rep[F] => A): F[A]
-
-  override def cotabulate[A, B](k: Rep[F] => B): F[B]    = tabulate(k)
-  override def lmap[A, B, C](fab: F[B])(f: C => A): F[B] = fab
-
-  override def flatMap[A, B](fa: F[A])(f: A => F[B]): F[B] = tabulate(r => r(f(r(fa))))
-  override def tailRecM[A, B](a: A)(f: A => F[Either[A, B]]): F[B] = {
-    @tailrec def go(a: A)(r: Rep[F]): B = r(f(a)) match {
-      case Left(value)  => go(value)(r)
-      case Right(value) => value
-    }
-    tabulate(go(a))
-  }
-  override def pure[A](x: A): F[A]                         = tabulate(_ => x)
-}
-
-object Representable {
-  def index[F[_], A](fa: F[A], r: Rep[F]): A = r.apply(fa)
 }
 
 @typeclass
 trait ProCorep[P[_, _]] extends Pro[P] {
-  type PR[A] = Rep[P[A, *]]
+  type PR[A] = Rep[P, A]
 
-  def cotabulate[A, B](k: Rep[P[A, *]] => B): P[A, B]
+  def cotabulate[A, B](k: Rep[P, A] => B): P[A, B]
 
   override def rmap[A, B, C](fab: P[A, B])(f: B => C): P[A, C] = cotabulate(rep => f(rep(fab)))
 
@@ -89,8 +90,8 @@ trait ProCorep[P[_, _]] extends Pro[P] {
   def merge[A, B, C](pab: P[A, B], pac: P[A, C]): P[A, (B, C)] =
     cotabulate(rep => (rep(pab), rep(pac)))
 
-  def functor: Functor[Rep.prof[P, *]] = new Functor[prof[P, *]] {
-    def map[A, B](fa: prof[P, A])(f: A => B): prof[P, B] = fa(lmap(cotabulate(identity[Rep[P[B, *]]]))(f))
+  def functor: Functor[Rep[P, *]] = new Functor[Rep[P, *]] {
+    def map[A, B](fa: Rep[P, A])(f: A => B): Rep[P, B] = fa(lmap(cotabulate[B, Rep[P, B]](identity[Rep[P, B]]))(f))
   }
 
   def constant[A, B](b: B): P[A, B] = cotabulate(_ => b)
@@ -107,7 +108,7 @@ trait ProTraverse[P[_, _]] extends ProCorep[P] {
   def prosequence[F[_], A, B](p: P[A, B])(implicit F: Applicative[F]): P[F[A], F[B]] =
     tabTraverse[F, F[A], A, F[B]](identity)(F.map(_)(_(p)))
 
-  override def cotabulate[A, B](k: PR[A] => B): P[A, B] =
+  override def cotabulate[A, B](k: Rep[P, A] => B): P[A, B] =
     tabTraverse[Id, A, A, B](identity)(k)
 
   override def lmap[A, B, C](fab: P[A, B])(f: C => A): P[C, B] =
@@ -116,12 +117,12 @@ trait ProTraverse[P[_, _]] extends ProCorep[P] {
   def tabTraverse[F[_]: Applicative, A, B, C](left: A => F[B])(right: F[PR[B]] => C): P[A, C]
 }
 
-object ProTraverse extends ProTraverseInstances {
+object ProTraverse {
 
-  class Tab[F[_], A, B, C, P[-_, _]](val left: A => F[B], val right: F[Rep[P[B, *]]] => C)(implicit
+  class Tab[F[_], A, B, C, P[-_, _]](val left: A => F[B], val right: F[Rep[P, B]] => C)(implicit
       val F: Applicative[F]
   ) {
-    final def rep = Rep.pro[P, B]
+    final def rep = Rep[P, B]
   }
 
   def make[P[-_, _]] = new Maker[P]
@@ -135,35 +136,13 @@ object ProTraverse extends ProTraverseInstances {
   }
 
   abstract class Applied[Fa[_], Aa, Ba, Ca, P[-_, _]] extends ProTraverse[P] {
-    def tabTravArb(left: Aa => Fa[Ba])(right: Fa[Rep[P[Ba, *]]] => Ca)(F: Applicative[Fa]): P[Aa, Ca]
+    def tabTravArb(left: Aa => Fa[Ba])(right: Fa[Rep[P, Ba]] => Ca)(F: Applicative[Fa]): P[Aa, Ca]
 
-    override def tabTraverse[F[_], A, B, C](left: A => F[B])(right: F[Rep[P[B, *]]] => C)(implicit
+    override def tabTraverse[F[_], A, B, C](left: A => F[B])(right: F[Rep[P, B]] => C)(implicit
         F: Applicative[F]
     ): P[A, C] =
-      tabTravArb(left.asInstanceOf[Aa => Fa[Ba]])(right.asInstanceOf[Fa[Rep[P[Ba, *]]] => Ca])(
+      tabTravArb(left.asInstanceOf[Aa => Fa[Ba]])(right.asInstanceOf[Fa[Rep[P, Ba]] => Ca])(
         F.asInstanceOf[Applicative[Fa]]
       ).asInstanceOf[P[A, C]]
   }
-}
-
-class ProTraverseInstances {
-  import tofu.syntax.monadic._
-  type Extend1[X1, P[-i, +o], -I, +O]     = P[I, X1 => O]
-  type Extend2[X1, X2, P[-i, +o], -I, +O] = P[I, (X1, X2) => O]
-
-  final implicit def extend1[X1, P[-i, +o]](implicit pt: ProTraverse[P]): ProTraverse[Extend1[X1, P, -*, +*]] =
-    new ProTraverse[Extend1[X1, P, -*, +*]] {
-      def tabTraverse[F[_]: Applicative, A, B, C](left: A => F[B])(right: F[PR[B]] => C): P[A, X1 => C] =
-        pt.tabTraverse[F, A, B, X1 => C](left)(fpr =>
-          x1 => right(fpr.map(r => Rep.pro[Extend1[X1, P, -*, +*], B](p => r(p)(x1))))
-        )
-    }
-
-  final implicit def extend2[X1, X2, P[-i, +o]](implicit pt: ProTraverse[P]): ProTraverse[Extend2[X1, X2, P, -*, +*]] =
-    new ProTraverse[Extend2[X1, X2, P, -*, +*]] {
-      def tabTraverse[F[_]: Applicative, A, B, C](left: A => F[B])(right: F[PR[B]] => C): P[A, (X1, X2) => C] =
-        pt.tabTraverse[F, A, B, (X1, X2) => C](left)(fpr =>
-          (x1, x2) => right(fpr.map(r => Rep.pro[Extend2[X1, X2, P, -*, +*], B](p => r(p)(x1, x2))))
-        )
-    }
 }

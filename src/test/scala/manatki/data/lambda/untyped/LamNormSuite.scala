@@ -36,3 +36,21 @@ class LamNormSuite extends FunSuite {
 ////    assertEquals(plus(int(3), int(4)).normal.show, "λ s.λ z.s (s (s (s (s (s (s (z)))))))")
 //  }
 }
+
+object LamPrepCheck extends App {
+  import Lam.mk._
+  import Lam.nat._
+  import Lam.stringOps
+  import io.circe.syntax._
+
+  import Normalize.encoder
+  import Normalize.jsoner
+
+  val exp1 = "x".vari("x".lam("x".vari), "y".lam("x".vari))
+  println(Normalize.prepare(exp1).asJson.spaces2)
+  println(Normalize.prepare(exp1).unpack(Normalize.rename("x", "z")).asJson.spaces2)
+  println(Normalize(plus(int(2), int(2))).show)
+  println(Normalize(mul(mul(int(2), int(2)), int(2))).show)
+  println(Normalize(pow(int(2), int(2))).show)
+//  println(Normalize.nf(plus(int(2), int(2))).va.show)
+}

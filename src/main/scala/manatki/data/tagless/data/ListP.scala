@@ -1,11 +1,8 @@
 package manatki.data.tagless.data
 import cats.syntax.show._
-import cats.tagless.autoFunctorK
 import cats.{Applicative, Functor, Show}
-import derevo.derive
 import manatki.data.tagless.ProTraverse.Tab
-import manatki.data.tagless.{Builder, FunK2, ProTraverse, ProfData, ProfData1, Representable, data}
-import tofu.higherKind.RepresentableK
+import manatki.data.tagless.{Builder, FunK2, ProTraverse, ProfData1}
 import tofu.higherKind.derived.representableK
 
 trait ListP[-A, -I, +O] extends Cons[A, I, O] with Nil[O]

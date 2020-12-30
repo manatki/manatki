@@ -16,7 +16,7 @@ object Cons {
   }
 
   implicit def corepresentable[I]: ProTraverse[Cons[I, *, *]] = new ProTraverse[Cons[I, *, *]] {
-    def tabTraverse[F[_]: Applicative, A, B, C](left: A => F[B])(right: F[Rep[Cons[I, B, *]]] => C): Cons[I, A, C] =
+    def tabTraverse[F[_]: Applicative, A, B, C](left: A => F[B])(right: F[Rep[Cons[I, -*, +*], B]] => C): Cons[I, A, C] =
       new Tab(left, right) with TabTraverse[I, F, A, B, C, Cons[I, -*, +*]]
   }
 }

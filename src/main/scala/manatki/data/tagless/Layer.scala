@@ -41,7 +41,7 @@ object Layer {
     def fold[A](p: P[A, A])(implicit P: Pro[P]): A = layer.unpack(P.lmap(p)(_.fold(p)))
 
     def gfold[W[_]: Comonad, A](dist: PDistr[P, W])(p: P[W[A], A])(implicit P: Pro[P]): A = {
-      lazy val go: P[Layer[P], W[Rep[P[W[A], *]]]] = P.lmap(dist.apply[W[A]])(_.unpack(go).map(_(p)).coflatten)
+      lazy val go: P[Layer[P], W[Rep[P, W[A]]]] = P.lmap(dist.apply[W[A]])(_.unpack(go).map(_(p)).coflatten)
       layer.unpack(go).extract.apply(p)
     }
 
@@ -85,11 +85,11 @@ object Layer {
     P.merge(pab, P.lmap(pb)(_._2))
 
   private def cofreeDist[P[-_, _]](implicit P: ProCorep[P]): PDistr[P, CofreeP[P, *]] = {
-    def pdist[A]: P[CofreeP[P, A], CofreeP[P, Rep[P[A, *]]]] =
-      P.cotabulate { rep =>
-        new CofreeP[P, Rep[P[A, *]]] {
-          def value: Rep[P[A, *]]                             = rep.pmap(_.value)
-          def unpack[R](p: P[CofreeP[P, Rep[P[A, *]]], R]): R =
+    def pdist[A]: P[CofreeP[P, A], CofreeP[P, Rep[P, A]]] =
+      P.cotabulate[CofreeP[P, A], CofreeP[P, Rep[P, A]]] { rep =>
+        new CofreeP[P, Rep[P, A]] {
+          def value: Rep[P, A]                             = rep.pmap(_.value)
+          def unpack[R](p: P[CofreeP[P, Rep[P, A]], R]): R =
             rep(P.lmap(p)(_.unpack(pdist)))
         }
       }
@@ -113,6 +113,20 @@ trait GBuilder[-P[_, _], F[_], A] { self =>
 }
 
 object GBuilder {
+  def apply[P[_, _], F[_], A] = new Applied[P, F, A]
+
+  class Applied[P[_, _], F[_], A](private val __ : Boolean = true) extends AnyVal {
+    type Arb
+
+    def apply(builder: ArbBuilder[P, F, A, Arb]): GBuilder[P, F, A] = builder
+  }
+
+  abstract class ArbBuilder[P[_, _], F[_], A, W] extends GBuilder[P, F, A] {
+    def continueArb(init: A, p: P[F[A], W]): W
+
+    def continue[B](init: A, p: P[F[A], B]): B = continueArb(init, p.asInstanceOf[P[F[A], W]]).asInstanceOf[B]
+  }
+
   implicit class BuilderUnfoldOpsC[P[-_, _], A](private val builder: Builder[P, A]) extends AnyVal {
     def unfold(init: A)(implicit P: LMap[P]): Layer[P]                  =
       new Layer[P] {
@@ -153,16 +167,16 @@ object GBuilder {
 
   implicit class GBuilderOpsC[P[-_, _], F[_], A](private val builder: GBuilder[P, F, A]) extends AnyVal {
     def gunfold(dist: PCodistr[P, F])(init: A)(implicit P: LMap[P], F: Monad[F]): Layer[P] = {
-      def go(fra: F[Rep[P[F[A], *]]]): Layer[P] =
-        Layer[P](p => dist(fra, P.lmap(p)((ffa: F[F[A]]) => go(ffa.flatten.map(a => Rep.pro[P, F[A]](builder(a, _)))))))
+      def go(fra: F[Rep[P, F[A]]]): Layer[P] =
+        Layer[P](p => dist(fra, P.lmap(p)((ffa: F[F[A]]) => go(ffa.flatten.map(a => Rep[P, F[A]](builder(a, _)))))))
 
-      go(Rep.pro[P, F[A]](p => builder(init, p)).pure)
+      go(Rep[P, F[A]](p => builder(init, p)).pure)
     }
   }
 
   private def freeСodist[P[-_, _]](implicit P: LMap[P]): PCodistr[P, FreeP[P, *]] =
     new PCodistr[P, FreeP[P, *]] {
-      override def apply[A, R](mr: FreeP[P, Rep[P[A, *]]], pr: P[FreeP[P, A], R]): R =
+      override def apply[A, R](mr: FreeP[P, Rep[P, A]], pr: P[FreeP[P, A], R]): R =
         mr.unpack(P.lmap(pr)(fp => FreeP[P, A](this(fp, _))))(_(P.lmap(pr)(FreeP.pure)))
     }
 
@@ -172,21 +186,7 @@ object GBuilder {
 }
 
 object Builder {
-
-  def apply[P[_, _], A] = new Applied[P, A](true)
-
-  class Applied[P[_, _], A](private val __ : Boolean) extends AnyVal {
-    type Arb
-
-    def apply(builder: ArbBuilder[P, A, Arb]): Builder[P, A] = builder
-  }
-
-  abstract class ArbBuilder[P[_, _], A, W] extends Builder[P, A] {
-    def continueArb(init: A, p: P[A, W]): W
-
-    def continue[B](init: A, p: P[A, B]): B = continueArb(init, p.asInstanceOf[P[A, W]]).asInstanceOf[B]
-  }
-
+  def apply[P[_, _], A] = new GBuilder.Applied[P, Id, A](true)
 }
 
 trait CofreeP[-P[-_, _], +A] {
@@ -395,16 +395,16 @@ object PDistr {
 
   class Make[P[_, _], F[_]](private val __ : Boolean) extends AnyVal {
     type Arb
-    def apply(p: P[F[Arb], F[Rep[P[Arb, *]]]]): T[P, F] = p.asInstanceOf[T[P, F]]
+    def apply(p: P[F[Arb], F[Rep[P, Arb]]]): T[P, F] = p.asInstanceOf[T[P, F]]
   }
 
   implicit class PDistrOps[P[_, _], F[_]](private val t: T[P, F]) extends AnyVal {
-    def apply[A]: P[F[A], F[Rep[P[A, *]]]] = t.asInstanceOf[P[F[A], F[Rep[P[A, *]]]]]
+    def apply[A]: P[F[A], F[Rep[P, A]]] = t.asInstanceOf[P[F[A], F[Rep[P, A]]]]
   }
 }
 
 trait PCodistr[P[_, _], F[_]] {
-  def apply[A, R](mr: F[Rep[P[A, *]]], pr: P[F[A], R]): R
+  def apply[A, R](mr: F[Rep[P, A]], pr: P[F[A], R]): R
 }
 
 object PCodistr {
@@ -418,9 +418,9 @@ object PCodistr {
   }
 
   trait Maker[P[_, _], F[_], AA, AR] extends PCodistr[P, F] {
-    def applyArb(mr: F[Rep[P[AA, *]]], pr: P[F[AA], AR]): AR
+    def applyArb(mr: F[Rep[P, AA]], pr: P[F[AA], AR]): AR
 
-    def apply[A, R](mr: F[Rep[P[A, *]]], pr: P[F[A], R]): R =
-      applyArb(mr.asInstanceOf[F[Rep[P[AA, *]]]], pr.asInstanceOf[P[F[AA], AR]]).asInstanceOf[R]
+    def apply[A, R](mr: F[Rep[P, A]], pr: P[F[A], R]): R =
+      applyArb(mr.asInstanceOf[F[Rep[P, AA]]], pr.asInstanceOf[P[F[AA], AR]]).asInstanceOf[R]
   }
 }
