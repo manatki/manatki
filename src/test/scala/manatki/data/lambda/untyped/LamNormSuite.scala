@@ -59,25 +59,24 @@ object LamPrepCheck extends App {
 //  println(Normalize.nf(plus(int(2), int(2))).va.show)
 }
 
-object LamSimpleNormCheck extends App {
+object LamNormCheck extends App {
   import Lam.nat._
   import Lam.stringOps
+  import Normalize.{encoder, jsoner}
+  import io.circe.syntax._
 
-  def check(lam: Lam.T) : Unit = println(SimpleNorm(lam).show)
-  val exp1 = "x".vari("x".lam("x".vari), "y".lam("x".vari))
-//  check(int(2))
-//  check(exp1)
-//  check(int(0))
-//  check(plus(int(2), int(2)))
+  val exp1              = "x".vari("x".lam("x".vari), "y".lam("x".vari))
+  def check(exp: Lam.T) = println(exp.norm.show)
+  check(int(0))
+  check(int(2))
+  check(exp1)
+  check(plus(int(2), int(2)))
   check(mul(int(1), int(0)))
-//  println(Normalize(mul(mul(int(2), int(2)), int(2))).show)
-//  println(Normalize(pow(int(2), int(2))).show)
-//  println(Normalize(pow(int(3), int(2))).show)
-//  println(Normalize(pow(int(2), int(3))).show)
-//  println(Normalize(mul_(int(2), int(3))).show)
-//  println(Normalize(mul_(int(3), int(2))).show)
-//  println(Normalize(pow_(int(3), int(2))).show)
-//  println(Normalize(pow_(int(2), int(3))).show)
-//  println(Normalize(pow__(int(2), int(3))).show)
-//  //  println(Normalize.nf(plus(int(2), int(2))).va.show)
+  check(mul(int(3), int(3)))
+  check(mul_(int(3), int(3)))
+  check(mul(mul(int(2), int(2)), int(2)))
+  check(pow(int(2), int(2)))
+  check(pow(int(2), int(3)))
+  check(pow_(int(2), int(3)))
+  check(pow__(int(2), int(3)))
 }
