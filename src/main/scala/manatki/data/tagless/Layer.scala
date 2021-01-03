@@ -16,7 +16,8 @@ trait Layer[-P[-_, _]] extends LayerOr[P, Nothing] {
 final case class LayerVal[+A](a: A) extends LayerOr[Any, A]
 
 object Layer {
-  type IdC[+A] = A
+  type IdC[+A]                = A
+  type Extend[-P[-_, +_], +A] = Layer[λ[(`-x`, y) => P[x, A => y]]]
 
   def apply[P[-_, _]] = new Applied[P](true)
   def mk[P[-_, _]]    = new Applied[P](true)
@@ -422,5 +423,32 @@ object PCodistr {
 
     def apply[A, R](mr: F[Rep[P, A]], pr: P[F[A], R]): R =
       applyArb(mr.asInstanceOf[F[Rep[P, AA]]], pr.asInstanceOf[P[F[AA], AR]]).asInstanceOf[R]
+  }
+}
+
+trait CofreePE[-P[-_, +_], +A] {
+  def uncofree[R](f: A => P[CofreePE[P, A], R]): R
+
+  def value[P1[-x, y] <: P[x, y]](implicit P: ProCorep[P1]): A = uncofree(P.constant(_))
+
+  def flip[P1[-x, +y] <: P[x, y]](implicit P: ProCorep[P1]): Layer.Extend[P1, A] =
+    Layer.mk(p => uncofree(a => P.dimap(p)((_: CofreePE[P, A]).flip)(_(a))))
+}
+
+object CofreePE {
+  def unflip[P[-_, +_], A](layer: Layer.Extend[P, A])(implicit P: ProCorep[P]): CofreePE[P, A] =
+    mk[P, A](f => layer.unpack(P.lmap(P.cotabulate((rep: Rep[P, CofreePE[P, A]]) => (a: A) => rep(f(a))))(unflip(_))))
+
+  def mk[P[-_, +_], A]: Applied[P, A] = new Applied
+
+  class Applied[P[-_, +_], A](private val __ : Boolean = true) extends AnyVal {
+    type W
+    def apply(maker: Maker[P, A, W]): CofreePE[P, A] = maker
+  }
+
+  abstract class Maker[P[-_, +_], +A, W] extends CofreePE[P, A] {
+    def sam(f: A => P[CofreePE[P, A], W]): W
+
+    def uncofree[R](f: A => P[CofreePE[P, A], R]): R = sam(f.asInstanceOf[A => P[CofreePE[P, A], W]]).asInstanceOf[R]
   }
 }
