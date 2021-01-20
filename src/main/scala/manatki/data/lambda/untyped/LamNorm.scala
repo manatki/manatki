@@ -2,11 +2,14 @@ package manatki.data.lambda.untyped
 
 import cats.syntax.foldable._
 import cats.syntax.traverse._
+import cats.tagless.FunctorK
 import cats.{Applicative, Eval}
+import manatki.data
+import manatki.data.lambda
+import manatki.data.lambda.untyped
 import manatki.data.tagless.ProTraverse.Tab
 import manatki.data.tagless._
 import tofu.higherKind.derived.representableK
-import tofu.syntax.monadic._
 
 trait LamNorm[-I, +O] {
   def varApp(vari: String, args: Vector[I]): O
@@ -15,7 +18,7 @@ trait LamNorm[-I, +O] {
   final def vapp(name: String, args: I*) = varApp(name, args.toVector)
 }
 
-object LamNorm extends ProfData[LamNorm] with ProfFoldOps with ProfMatchOps {
+object LamNorm extends ProfData[LamNorm] with ProfFoldOps with ProfMatchOps with ProfParaLOps {
 
   object nat {
     import mk._
@@ -46,10 +49,8 @@ object LamNorm extends ProfData[LamNorm] with ProfFoldOps with ProfMatchOps {
   implicit lazy val foldFunctor = representableK.instance
 
   trait ProTab[F[_], A, B, C, P[-x, +y] <: LamNorm[x, y]] extends Tab[F, A, B, C, P] with LamNorm[A, C] {
-    def varApp(vari: String, args: Vector[A]): C =
-      right(args.traverse(left).map(bs => rep(_.varApp(vari, bs))))
-
-    def lam(param: String, body: A): C = right(left(body).map(b => rep(_.lam(param, b))))
+    def varApp(vari: String, args: Vector[A]): C = mkTraverse(args)(bs => _.varApp(vari, bs))
+    def lam(param: String, body: A): C           = mkMap(body)(b => _.lam(param, b))
   }
 
   implicit lazy val showFold: Fold[String] = new Fold[String] {
@@ -101,4 +102,22 @@ object LamNorm extends ProfData[LamNorm] with ProfFoldOps with ProfMatchOps {
       def lam(param: String, body: T): Eval[T]           = body.substitute(param, expr)
     }
   }
+
+  abstract class ParaLOps[F[_]] {
+    def rename1(old: String, neu: String): F[T]
+  }
+
+  object paralOps extends ParaLOps[ParaL] {
+    def rename1(old: String, neu: String) = new ParaL[T] {
+      def varApp(vari: String, args: Vector[(Eval[T], T)]): Eval[T] =
+        args.traverse(_._1).map(mk.varApp(if (vari == old) neu else vari, _))
+
+      def lam(param: String, body: (Eval[T], T)): Eval[T] =
+        (if(param == old) Eval.now(body._2) else body._1).map(mk.lam(param, _))
+    }
+  }
+
+  val paralFunctor = representableK.instance
 }
+
+

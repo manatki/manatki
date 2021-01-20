@@ -2,6 +2,8 @@ package manatki.data.lambda.untyped
 import cats.syntax.show._
 import munit.FunSuite
 
+
+
 class LamNormSuite extends FunSuite {
   test("lam show") {
     import LamNorm.mk._
@@ -43,7 +45,7 @@ object LamPrepCheck extends App {
   import Normalize.{encoder, jsoner}
   import io.circe.syntax._
 
-  val exp1 = "x".vari("x".lam("x".vari), "y".lam("x".vari))
+  val exp1 = "x".v("x".lam("x".v), "y".lam("x".v))
   println(Normalize.prepare(exp1).asJson.spaces2)
   println(Normalize.prepare(exp1).unpack(Normalize.renamer("x", "z")).asJson.spaces2)
   println(Normalize(plus(int(2), int(2))).show)
@@ -65,7 +67,7 @@ object LamNormCheck extends App {
   import Normalize.{encoder, jsoner}
   import io.circe.syntax._
 
-  val exp1              = "x".vari("x".lam("x".vari), "y".lam("x".vari))
+  val exp1              = "x".v("x".lam("x".v), "y".lam("x".v))
   def check(exp: Lam.T) = println(exp.norm.show)
   check(int(0))
   check(int(2))
@@ -78,5 +80,11 @@ object LamNormCheck extends App {
   check(pow(int(2), int(2)))
   check(pow(int(2), int(3)))
   check(pow_(int(2), int(3)))
+  check(pow_(int(3), int(2)))
   check(pow__(int(2), int(3)))
+  check(pred(int(4)))
+  check(minus(int(7), int(5)))
+  check(pow(int(5), int(2)))
+  check(mul(int(4), int(6)))
+  check(minus(pow(int(3), int(2)), mul(int(2), int(3))))
 }

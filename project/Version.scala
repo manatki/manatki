@@ -46,4 +46,6 @@ object Version {
   val spire = "0.17.0-M1"
 
   val circe = "0.13.0"
+
+  val fastParse   = "2.2.2"
 }

@@ -1,5 +1,7 @@
 package manatki.data.tagless
-import cats.{Applicative, Functor, Id}
+import cats.{Applicative, Functor, Id, Traverse}
+import manatki.data.tagless.ProTraverse.Tab
+import manatki.data.tagless.ProTraverseMakers.TabPure
 import simulacrum.typeclass
 
 import scala.annotation.unchecked.{uncheckedVariance => uv}
@@ -122,7 +124,17 @@ object ProTraverse {
   class Tab[F[_], A, B, C, P[-_, _]](val left: A => F[B], val right: F[Rep[P, B]] => C)(implicit
       val F: Applicative[F]
   ) {
-    final def rep = Rep[P, B]
+    import ProTraverseMakers._
+    final def rep                                                                           = Rep[P, B]
+    final def tabPure(rep: Rep[P, B]): C                                                    = right(F.pure(rep))
+    final def tabMap(a: A)(f: B => Rep[P, B]): C                                            = right(F.map(left(a))(f))
+    final def tabMap2(x: A, y: A)(f: (B, B) => Rep[P, B]): C                                = right(F.map2(left(x), left(y))(f))
+    final def tabTraverse[T[_]](as: T[A])(f: T[B] => Rep[P, B])(implicit T: Traverse[T]): C =
+      right(F.map(T.traverse(as)(left))(f))
+    final def mkPure                                                                        = new TabPure(this)
+    final def mkMap                                                                         = new TabMap(this)
+    final def mkMap2                                                                        = new TabMap2(this)
+    final def mkTraverse                                                                    = new TabTrav(this)
   }
 
   def make[P[-_, _]] = new Maker[P]
@@ -144,5 +156,28 @@ object ProTraverse {
       tabTravArb(left.asInstanceOf[Aa => Fa[Ba]])(right.asInstanceOf[Fa[Rep[P, Ba]] => Ca])(
         F.asInstanceOf[Applicative[Fa]]
       ).asInstanceOf[P[A, C]]
+  }
+}
+
+object ProTraverseMakers {
+  import Rep.MakeRepr
+  trait HasArb extends Any {
+    type Arb
+  }
+
+  class TabPure[P[-_, _], A, B, C, F[_]](private val tab: Tab[F, A, B, C, P]) extends AnyVal with HasArb {
+    def apply(f: MakeRepr[P, B, Arb]): C = tab.tabPure(f)
+  }
+
+  class TabMap[P[-_, _], A, B, C, F[_]](private val tab: Tab[F, A, B, C, P]) extends AnyVal with HasArb {
+    def apply(a: A)(f: B => MakeRepr[P, B, Arb]): C = tab.tabMap(a)(f)
+  }
+
+  class TabMap2[P[-_, _], A, B, C, F[_]](private val tab: Tab[F, A, B, C, P]) extends AnyVal with HasArb {
+    def apply(x: A, y: A)(f: (B, B) => MakeRepr[P, B, Arb]): C = tab.tabMap2(x, y)(f)
+  }
+
+  class TabTrav[P[-_, _], A, B, C, F[_]](private val tab: Tab[F, A, B, C, P]) extends AnyVal with HasArb {
+    def apply[T[_]: Traverse](xs: T[A])(f: T[B] => MakeRepr[P, B, Arb]): C = tab.tabTraverse(xs)(f)
   }
 }

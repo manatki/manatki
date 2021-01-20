@@ -28,6 +28,7 @@ libraryDependencies += "com.github.julien-truffaut" %% "monocle-macro"          
 libraryDependencies += "com.github.julien-truffaut" %% "monocle-state"           % Version.monocle
 libraryDependencies += "org.typelevel"              %% "simulacrum"              % Version.simulacrum
 libraryDependencies += "org.typelevel"              %% "spire"                   % Version.spire
+libraryDependencies += "com.lihaoyi"                %% "fastparse"               % Version.fastParse
 
 //libraryDependencies += "ru.tinkoff"                 %% "tofu-optics-interop" % Version.tofu
 //libraryDependencies += "io.higherkindness"          %% "droste-core"         % Version.droste
@@ -79,6 +80,5 @@ testSettings
 libraryDependencies ++= akkas.map(_ % "test")
 
 libraryDependencies += "org.scalameta" %% "munit" % "0.7.20" % Test
-
 
 libraryDependencies += "org.typelevel" %% "discipline-core" % Version.discipline

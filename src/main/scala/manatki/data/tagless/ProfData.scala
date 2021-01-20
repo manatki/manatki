@@ -1,6 +1,6 @@
 package manatki.data.tagless
 
-import cats.{Id, Show}
+import cats.{Eval, Id, Show}
 import cats.tagless.FunctorK
 import io.circe.{Encoder, Json}
 import tofu.syntax.funk.funK
@@ -47,6 +47,17 @@ trait ProfMatchOps extends ProfDataBase {
 
   implicit def layerMatchOps(l: Layer[P]): MatchOps[Id] =
     matchFunctor.mapK(matchOps)(funK(matcher => l.unpack(matcher)))
+}
+
+trait ProfParaLOps extends ProfDataBase {
+  type ParaL[a] = P[(Eval[a], T), Eval[a]]
+  type ParaLOps[f[_]]
+
+  val paralOps: ParaLOps[ParaL]
+  implicit val paralFunctor: FunctorK[ParaLOps]
+
+  implicit def layerParaLOps(l: Layer[P]): ParaLOps[Eval] =
+    paralFunctor.mapK(paralOps)(funK(l.paraEval(_)))
 }
 
 abstract class ProfData1[P[-el, -input, +output]] {

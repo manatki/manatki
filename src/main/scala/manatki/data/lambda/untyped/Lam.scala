@@ -1,12 +1,9 @@
 package manatki.data.lambda.untyped
 
 import cats.Applicative
-import manatki.data.lambda
-import manatki.data.lambda.untyped
 import manatki.data.tagless.ProTraverse.Tab
 import manatki.data.tagless._
 import tofu.higherKind.derived.representableK
-import tofu.syntax.monadic._
 
 trait Lam[-I, +O] {
   def vari(name: String): O
@@ -20,23 +17,31 @@ object Lam extends ProfData[Lam] with ProfMatchOps with ProfFoldOps {
     def show             = x.showX._1
   }
 
-  implicit class stringOps(private val name: String) extends AnyVal {
+  implicit class stringOps(private val name: String)         extends AnyVal {
     def lam(body: T): T                 = mk.lam(name, body)
     def lam(names: String*)(body: T): T = (name +: names).foldRight(body)(mk.lam)
-    def vari: T                         = mk.vari(name)
+    def v: T                            = mk.vari(name)
+    def $ : T                           = mk.vari(name)
+  }
+  implicit class stringCtxOp(private val ctx: StringContext) extends AnyVal {
+    def lc(lams: T*) = LamParser(ctx.s(lams.map(_.show).map(s => s"($s)"): _*))
   }
 
   object nat {
-    def int(x: Int) = "s".lam("z")((1 to x).foldLeft("z".vari)((t, _) => "s".vari(t)))
-    val zero        = int(0)
-    val one         = int(1)
-    def plus        = "a".lam("b", "s", "z")("a".vari("s".vari, "b".vari("s".vari, "z".vari)))
-    def mul         = "x".lam("y")("x".vari(plus("y".vari), zero))
-    def pow         = "x".lam("y")("y".vari(mul("x".vari), one))
-    def mul_        = "x".lam("y", "s")("x".vari("y".vari("s".vari)))
-    def pow_        = "x".lam("y", "s")("y".vari("x".vari)("s".vari))
-    def pow__       = "x".lam("y")("y".vari("x".vari))
-
+    def int(x: Int) = "s".lam("z")((1 to x).foldLeft("z".v)((t, _) => "s".v(t)))
+    val zero        = lc"^s z.z"
+    val one         = lc"^s z.s z"
+    val plus        = lc"^a b s z.a s (b s z)"
+    val mul         = lc"^x y.x ($plus y) $zero"
+    val pow         = lc"^x y.y ($mul x ) $one"
+    val mul_        = lc"^x y s.x (y s)"
+    val pow_        = lc"^x y s.y x s"
+    val pow__       = lc"^x y.y x"
+    val pair        = lc"^x y f.f x y"
+    val fst         = lc"^p.p(^f s.f)"
+    val snd         = lc"^p.p(^f s.s)"
+    val pred        = lc"^x s z.$fst(x (^p.$pair ($snd p) (s ($snd p))) ($pair z z))"
+    val minus       = lc"^x y.y $pred x"
   }
 
   val showFold = new Fold[(String, Int)] {
@@ -54,9 +59,9 @@ object Lam extends ProfData[Lam] with ProfMatchOps with ProfFoldOps {
   }
 
   trait ProTab[F[_], A, B, C, P[-x, +y] <: Lam[x, y]] extends Tab[F, A, B, C, P] with Lam[A, C] {
-    def vari(name: String): C          = right(rep(_.vari(name)).pure)
-    def app(f: A, arg: A): C           = right(left(f).map2(left(arg))((fb, argb) => rep(_.app(fb, argb))))
-    def lam(param: String, body: A): C = right(left(body).map(b => rep(_.lam(param, b))))
+    def vari(name: String): C          = mkPure(_.vari(name))
+    def app(f: A, arg: A): C           = mkMap2(f, arg)((fb, argb) => _.app(fb, argb))
+    def lam(param: String, body: A): C = mkMap(body)(b => _.lam(param, b))
   }
   type NormPrep[-I, +O] = Lam[I, (Long, Set[String]) => O]
   abstract class MatchOps[F[_]] {
@@ -74,9 +79,11 @@ object Lam extends ProfData[Lam] with ProfMatchOps with ProfFoldOps {
     }
   }
 
+  type DBJ = (Int, Map[String, Int]) => debrujin.Lam.T
   abstract class FoldOps[F[_]] {
     def showX: F[(String, Int)]
     def norm: F[LamNorm.T]
+    def dbj: F[DBJ]
   }
   lazy val foldFunctor = representableK.instance
 
@@ -94,5 +101,33 @@ object Lam extends ProfData[Lam] with ProfMatchOps with ProfFoldOps {
       def lam(param: String, body: LamNorm.T): LamNorm.T = LamNorm.mk.lam(param, body)
       def app(f: LamNorm.T, arg: LamNorm.T): LamNorm.T   = f.apply(arg).value
     }
+
+    object dbj extends Fold[DBJ] {
+      private[this] val dbj       = debrujin.Lam.mk
+      def vari(name: String): DBJ = (_, m) => dbj.vari(m(name))
+
+      def app(f: DBJ, arg: DBJ): DBJ = (d, m) => dbj.app(f(d, m), arg(d, m))
+
+      def lam(param: String, body: DBJ): DBJ = (d, m) => dbj.lam(param, body(d + 1, m.updated(param, d)))
+    }
   }
+}
+
+object LamParser {
+  import fastparse._
+  import fastparse.ScalaWhitespace._
+
+  def name[_: P]        = P(CharIn("a-z", "A-Z") ~~ CharIn("a-z", "A-Z", "_'", "0-9").repX).!
+  def lambda[_: P]      =
+    P(CharIn("^λ") ~ name.rep(1) ~ "." ~ term)
+      .map { case (names, body) => names.foldRight(body)(Lam.mk.lam) }
+  def variable[_: P]    = name.map(Lam.mk.vari)
+  def paren[_: P]       = P("(" ~ term ~ ")")
+  def simple[_: P]      = P(variable | paren)
+  def application[_: P] = simple.rep(1).map(_.reduce(Lam.mk.app))
+
+  def term[_: P]: P[Lam.T] = P(application | lambda)
+  def wholeTerm[_: P]      = term ~ End
+
+  def apply(s: String) = parse(s, wholeTerm(_)).get.value
 }
