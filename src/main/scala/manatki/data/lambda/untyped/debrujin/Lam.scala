@@ -16,8 +16,8 @@ object Lam extends ProfData[Lam] {
   }
 
   trait TabTraverse[F[_], A, B, C] extends ProTraverse.Tab[F, A, B, C, Lam] with Lam[A, C] {
-    def vari(i: Int): C      = mkPure(_.vari(i))
-    def lam(name: String, body: A): C      = mkMap(body)(b => _.lam(name, b))
-    def app(f: A, arg: A): C = mkMap2(f, arg)((fb, argb) => _.app(fb, argb))
+    def vari(i: Int): C               = mkPure(_.vari(i))
+    def lam(name: String, body: A): C = mkMap(body)(b => _.lam(name, b))
+    def app(f: A, arg: A): C          = mkMap2(f, arg)((fb, argb) => _.app(fb, argb))
   }
 }
