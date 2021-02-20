@@ -6,3 +6,4 @@ project/target
 .bloop
 metals.sbt
 .vscode
+.bsp

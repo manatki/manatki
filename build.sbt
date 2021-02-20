@@ -2,7 +2,7 @@ name := "manatki"
 
 version in ThisBuild := "0.1"
 
-scalaVersion in ThisBuild := "2.13.3"
+scalaVersion in ThisBuild := "2.13.4"
 
 val akkas =
   (List("actor", "actor-typed", "stream").map(_ -> Version.akka) :+ ("http" -> Version.akkaHttp)).map {
@@ -19,11 +19,11 @@ libraryDependencies += "org.typelevel"              %% "alleycats-core"         
 libraryDependencies += "org.typelevel"              %% "cats-effect"             % Version.catsEffect
 libraryDependencies += "org.typelevel"              %% "cats-mtl-core"           % Version.catsMtl
 libraryDependencies += "org.typelevel"              %% "cats-tagless-macros"     % Version.catsTagless
-libraryDependencies += "ru.tinkoff"                 %% "tofu-core"               % Version.tofu
-libraryDependencies += "ru.tinkoff"                 %% "tofu-logging-derivation" % Version.tofu
-libraryDependencies += "ru.tinkoff"                 %% "tofu-derivation"         % Version.tofu
-libraryDependencies += "ru.tinkoff"                 %% "tofu-concurrent"         % Version.tofu
-libraryDependencies += "ru.tinkoff"                 %% "tofu-optics-macro"       % Version.tofu
+libraryDependencies += "tf.tofu"                    %% "tofu-core"               % Version.tofu
+libraryDependencies += "tf.tofu"                    %% "tofu-logging-derivation" % Version.tofu
+libraryDependencies += "tf.tofu"                    %% "tofu-derivation"         % Version.tofu
+libraryDependencies += "tf.tofu"                    %% "tofu-concurrent"         % Version.tofu
+libraryDependencies += "tf.tofu"                    %% "tofu-optics-macro"       % Version.tofu
 libraryDependencies += "com.github.julien-truffaut" %% "monocle-macro"           % Version.monocle
 libraryDependencies += "com.github.julien-truffaut" %% "monocle-state"           % Version.monocle
 libraryDependencies += "org.typelevel"              %% "simulacrum"              % Version.simulacrum
@@ -61,7 +61,7 @@ lazy val akka = project.settings(libraryDependencies ++= akkas ++ circes)
 
 lazy val fsfs = project
   .settings(
-    libraryDependencies += "ru.tinkoff" %% "tofu-core"     % Version.tofu,
+    libraryDependencies += "tf.tofu"    %% "tofu-core"     % Version.tofu,
     libraryDependencies += ("co.fs2"    %% "fs2-io"        % Version.fs2) withSources (),
     libraryDependencies += "org.http4s" %% "http4s-server" % Version.http4s,
     plugins,

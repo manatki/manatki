@@ -26,21 +26,42 @@ package object fsfs {
     for {
       termination <- Deferred[F, Unit]
       shutdown    <- Deferred[F, F[Unit]]
-      hook        = shutdown.complete(termination.complete(())) *> termination.get
+      hook         = shutdown.complete(termination.complete(())) *> termination.get
       _           <- F.delay(sys.addShutdownHook(hook.toIO.unsafeRunSync()))
     } yield shutdown.get
 
   // as requested by S.Mukhorovsky
   /** performs some action after first element received */
-  implicit class FS2ManatkiStreamOps[F[_], A](val stream: fs2.Stream[F, A]) {
+  implicit class FS2ManatkiStreamOps[F[_], A](private val stream: fs2.Stream[F, A]) {
     def doAfterHead(action: A => F[Unit])(implicit F: Functor[F]): fs2.Stream[F, A] =
       stream.pull.uncons1.flatMap { opt =>
-        opt.map {
-          case (head, tail) =>
+        opt
+          .map { case (head, tail) =>
             fs2.Stream.eval(action(head) as head) ++ tail
-        }.getOrElse(fs2.Stream.empty).pull.echo
+          }
+          .getOrElse(fs2.Stream.empty)
+          .pull
+          .echo
       }.stream
-  }
 
+    final case class GBW[K, +V](inScope: Boolean = false, vals: Map[K, V] = Map.empty[K, V], include: Boolean = false)
+
+    //requested by @curiosady in @scala_learn 20.02.2021 13:49 https://t.me/scala_learn/22768
+    def groupBetweenWith[K, V](bounds: PartialFunction[A, Boolean])(kv: A => (K, V))(
+        agg: (V, V) => V
+    ): fs2.Stream[F, Map[K, V]] =
+      stream
+        .scan(GBW[K, V]()) {
+          case (GBW(false, m, _), a) if bounds.lift(a) == Some(true) => GBW(inScope = true)
+          case (GBW(true, m, _), a) if bounds.lift(a) == Some(false) => GBW(vals = m, include = true)
+          case (state, a) if bounds.isDefinedAt(a)                   => state
+          case (GBW(false, m, _), _)                                 => GBW()
+          case (GBW(true, m, _), a)                                  =>
+            val (k, v) = kv(a)
+            GBW(true, m.updatedWith(k)(ov => Some(ov.fold(v)(agg(v, _)))))
+        }
+        .filter(_.include)
+        .map(_.vals)
+  }
 
 }
