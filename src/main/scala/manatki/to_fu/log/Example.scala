@@ -5,8 +5,8 @@ import cats.syntax.show._
 import cats.syntax.monoid._
 import tofu.logging.DictLoggable
 import tofu.logging.LogRenderer
-import cats.instances.all._
 import tofu.logging.LogTree
+import cats.Show
 
 sealed trait X
 case class A(a: Int, b: String)                extends X
@@ -29,13 +29,13 @@ object X {
     def logShow(a: X): String =
       a match {
         case A(a, b) => show"A($a, $b)"
-        case B(c, d) => show"B($c, $d)"
+        case B(c, d) => show"B(${c.show}, $d)"
       }
   }
 }
 
-object Example extends App{
-    println(LogTree[X](A(1, "lol")))
-    println(LogTree[X](B(List("lol", "kek"), None)))
-    println(LogTree[X](B(List("lol", "kek"), Some(2))))
+object Example extends App {
+  println(LogTree[X](A(1, "lol")))
+  println(LogTree[X](B(List("lol", "kek"), None)))
+  println(LogTree[X](B(List("lol", "kek"), Some(2))))
 }
