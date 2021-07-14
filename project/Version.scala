@@ -7,7 +7,7 @@ object Version {
 
   val catsMtl = "0.7.0"
 
-  val catsTagless = "0.10"
+  val catsTagless = "0.14.0"
 
   val monix = "3.1.0"
 
@@ -27,13 +27,13 @@ object Version {
 
   val scalaTestCheck = "3.1.0.0-RC2"
 
-  val tofu = "0.10.0"
+  val tofu = "0.10.2"
 
   val zio = "1.0.0-RC21-2"
 
   val zioMacros = "0.6.2"
 
-  val kindProjector = "0.11.1"
+  val kindProjector = "0.13.0"
 
   val bm4 = "0.3.0"
 
@@ -48,4 +48,6 @@ object Version {
   val circe = "0.13.0"
 
   val fastParse   = "2.2.2"
+
+  val derevo = "0.12.5"
 }

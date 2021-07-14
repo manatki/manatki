@@ -1,8 +1,8 @@
 name := "manatki"
 
-version in ThisBuild := "0.1"
+ThisBuild / version := "0.1"
 
-scalaVersion in ThisBuild := "2.13.4"
+ThisBuild / scalaVersion := "2.13.6"
 
 val akkas =
   (List("actor", "actor-typed", "stream").map(_ -> Version.akka) :+ ("http" -> Version.akkaHttp)).map {
@@ -24,6 +24,7 @@ libraryDependencies += "tf.tofu"                    %% "tofu-logging-derivation"
 libraryDependencies += "tf.tofu"                    %% "tofu-derivation"         % Version.tofu
 libraryDependencies += "tf.tofu"                    %% "tofu-concurrent"         % Version.tofu
 libraryDependencies += "tf.tofu"                    %% "tofu-optics-macro"       % Version.tofu
+libraryDependencies += "tf.tofu"                    %% "derevo-core"             % Version.derevo
 libraryDependencies += "com.github.julien-truffaut" %% "monocle-macro"           % Version.monocle
 libraryDependencies += "com.github.julien-truffaut" %% "monocle-state"           % Version.monocle
 libraryDependencies += "org.typelevel"              %% "simulacrum"              % Version.simulacrum
@@ -35,7 +36,7 @@ libraryDependencies += "com.lihaoyi"                %% "fastparse"              
 
 libraryDependencies += "dev.zio" %% "zio"             % Version.zio
 libraryDependencies += "dev.zio" %% "zio-macros-core" % Version.zioMacros
-scalacOptions in ThisBuild ++= List(
+ThisBuild / scalacOptions ++= List(
   "-Ymacro-annotations",
   "-deprecation",
   "-feature",
@@ -68,6 +69,8 @@ lazy val fsfs = project
   )
   .settings(testSettings)
 
+
+  
 lazy val problems = project
   .dependsOn(manatki)
   .settings(plugins)

@@ -10,6 +10,7 @@ import cats.syntax.apply._
 import monocle.macros.Lenses
 
 import scala.collection.immutable.BitSet
+import scala.annotation.nowarn
 
 trait CyclicTrain[F[_]] {
   def moveForward: F[Unit]
@@ -43,6 +44,7 @@ object CyclicTrain {
 
   type CT = Vector[Boolean]
 
+  @nowarn
   object cyclicTrainState extends CyclicTrain[State[CT, *]] {
     def moveForward: State[CT, Unit]         = State.modify { case h +: rest => rest :+ h }
     def moveBack: State[CT, Unit]            = State.modify { case rest :+ l => l +: rest }

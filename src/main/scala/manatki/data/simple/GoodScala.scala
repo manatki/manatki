@@ -1,10 +1,13 @@
 package manatki.data.simple
 
+import scala.annotation.nowarn
+
 object GoodScala {
   sealed trait List[+A] {
     def isEmpty: Boolean
     def ::[B >: A](b: B): List[B]
 
+    @nowarn
     def foldLeft[B](b: B)(f: (B, A) => B): B = {
       def go(b: B, l: List[A]): B = l match {
         case Empty()   => b
