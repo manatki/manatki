@@ -13,10 +13,9 @@ trait Fiction[Q[_]] {
 
 object Fiction {
   // tags for type argument combination
-  sealed trait Place
-  final class Arg[+A]     extends Place
-  final class Sub[+E, +A] extends Place
-  final class Ret[+E, +A] extends Place
+  final class Arg[+A]
+  final class Sub[+E, +A]
+  final class Ret[+E, +A]
 }
 
 // closed family encoded as GADT
@@ -165,9 +164,7 @@ object Authorization {
               argScene(ftoken.arg[Token]).map { pt =>
                 subScene(faction.sub).map { fa =>
                   new Fabula[Authorization, P, S1, Either[E, AuthError], T] {
-                    def continue[R[e, a]](
-                        auth: Authorization[Exposition[P, S1, R, *]]
-                    ): R[Either[E, AuthError], T] =
+                    def continue[R[e, a]](auth: Exposed[P, S1, R]): R[Either[E, AuthError], T] =
                       auth.authorize(Arg(pt), Sub(fa)).ret
                   }
                 }
@@ -179,7 +176,7 @@ object Authorization {
             augRetell(
               argScene(fusername.arg).map2(argScene(fpass.arg)) { (username, pass) =>
                 Applicative[SF].pure(new Fabula[Authorization, P, S1, AuthError, Token] {
-                  def continue[R[e, a]](auth: Authorization[Exposition[P, S1, R, *]]): R[AuthError, Token] =
+                  def continue[R[e, a]](auth: Exposed[P, S1, R]): R[AuthError, Token] =
                     auth.authenticate(Arg(username), Arg(pass)).ret
                 })
               }
