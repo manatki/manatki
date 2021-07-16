@@ -12,9 +12,9 @@ object calct {
       calc: CalcT[F, R, S1, S2, E, A]
   )(r: R, init: S1): F[(S2, Either[E, A])] =
     calc.step(r, init).tailRecM {
-      case Ok(state, value)                    => Right((state, Right(value))).pure[F]
-      case Error(state, err)                   => Right((state, Left(err))).pure[F]
-      case wrap: Wrap[_, r, s, S2, x, E, m, A] =>
-        wrap.inner.map(x => Left(wrap.cont.success(wrap.state, x).step(wrap.input, wrap.state)))
+      case Ok(state, value)                   => Right((state, Right(value))).pure[F]
+      case Error(state, err)                  => Right((state, Left(err))).pure[F]
+      case wrap @ Wrap(input, state, inner, cont) =>
+        wrap.inner.map(x => Left(cont.success(state, x).step(input, wrap.state)))
     }
 }
