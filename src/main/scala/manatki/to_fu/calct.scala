@@ -14,7 +14,7 @@ object calct {
     calc.step(r, init).tailRecM {
       case Ok(state, value)                   => Right((state, Right(value))).pure[F]
       case Error(state, err)                  => Right((state, Left(err))).pure[F]
-      case wrap @ Wrap(input, state, inner, cont) =>
+      case wrap @ Wrap(input, state, _, cont) =>
         wrap.inner.map(x => Left(cont.success(state, x).step(input, wrap.state)))
     }
 }
