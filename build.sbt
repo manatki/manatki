@@ -25,6 +25,7 @@ libraryDependencies += "tf.tofu"                    %% "tofu-derivation"        
 libraryDependencies += "tf.tofu"                    %% "tofu-concurrent"         % Version.tofu
 libraryDependencies += "tf.tofu"                    %% "tofu-optics-macro"       % Version.tofu
 libraryDependencies += "tf.tofu"                    %% "tofu-zio-core"           % Version.tofu
+libraryDependencies += "tf.tofu"                    %% "tofu-doobie"             % Version.tofu
 libraryDependencies += "tf.tofu"                    %% "derevo-core"             % Version.derevo
 libraryDependencies += "com.github.julien-truffaut" %% "monocle-macro"           % Version.monocle
 libraryDependencies += "com.github.julien-truffaut" %% "monocle-state"           % Version.monocle
