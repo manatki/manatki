@@ -21,6 +21,7 @@ libraryDependencies += "org.typelevel"              %% "cats-mtl-core"          
 libraryDependencies += "org.typelevel"              %% "cats-tagless-macros"     % Version.catsTagless
 libraryDependencies += "tf.tofu"                    %% "tofu-core"               % Version.tofu
 libraryDependencies += "tf.tofu"                    %% "tofu-logging-derivation" % Version.tofu
+libraryDependencies += "tf.tofu"                    %% "tofu-logging-layout"     % Version.tofu
 libraryDependencies += "tf.tofu"                    %% "tofu-derivation"         % Version.tofu
 libraryDependencies += "tf.tofu"                    %% "tofu-concurrent"         % Version.tofu
 libraryDependencies += "tf.tofu"                    %% "tofu-optics-macro"       % Version.tofu
@@ -32,6 +33,7 @@ libraryDependencies += "com.github.julien-truffaut" %% "monocle-state"          
 libraryDependencies += "org.typelevel"              %% "simulacrum"              % Version.simulacrum
 libraryDependencies += "org.typelevel"              %% "spire"                   % Version.spire
 libraryDependencies += "com.lihaoyi"                %% "fastparse"               % Version.fastParse
+libraryDependencies += "org.tpolecat"               %% "doobie-postgres"         % "0.12.1" // Postgres driver 42.2.19 + type mappings.
 
 //libraryDependencies += "ru.tinkoff"                 %% "tofu-optics-interop" % Version.tofu
 //libraryDependencies += "io.higherkindness"          %% "droste-core"         % Version.droste

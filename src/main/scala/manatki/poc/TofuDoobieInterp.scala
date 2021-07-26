@@ -38,7 +38,13 @@ import cats.effect.IO
 import tofu.logging.Logs
 import tofu.logging.derivation.loggable
 import tofu.Delay
+import tofu.Tries
 import TDoobie._
+import tofu.BracketThrow
+import tofu.logging.derivation.loggingMidTry
+import tofu.logging.LoggingCompanion
+import cats.Id
+import tofu.doobie.ConnectionCIO
 
 class AccumLoggable(values: Seq[LoggedValue]) extends LoggedValue {
   override def shortName: String = "sql arguments"
@@ -79,8 +85,9 @@ object TDoobie {
       doobie.syntax.string.toSqlInterpolator(ctx).sql(parts.map(_.toFrag): _*)
   }
 
-  def tofuLogHandler[F[_]: Logging](level: Logging.Level): LogHandlerF[F] = { evt =>
-    val args = evt.args.collect { case lv: LoggedValue => lv }
+  def tofuLogHandler[F[_]: Logs.Universal](level: Logging.Level): LogHandlerF[F] = { evt =>
+    implicit val log = Logs[Id, F].named["doobie"]
+    val args         = evt.args.collect { case lv: LoggedValue => lv }
     info"executing query ${evt.sql} with ${AccumLoggable(args)}"
   }
 }
@@ -90,23 +97,24 @@ object TDoobie {
 final case class Ctx(traceId: String)
 
 // Model
+@derive(loggable)
 final case class Person(id: Long, name: String, deptId: Long)
+
+@derive(loggable)
 final case class Dept(id: Long, name: String)
 // create table department(id numeric primary key, name varchar);
 // create table person(id numeric primary key, name varchar, dept_id numeric references department(id));
 
 // Person SQL algebra
-@derive(representableK)
+@derive(representableK, loggingMidTry)
 trait PersonSql[F[_]] {
   def create(person: Person): F[Unit]
   def read(id: Long): F[Option[Person]]
 }
 
-object PersonSql {
-  def make[DB[_]: Monad: LiftConnectionIO: Logging: EmbeddableLogHandler]: PersonSql[DB] = {
-    val aspects = new LoggingMid[DB]
-    val impl    = EmbeddableLogHandler[DB].embedLift(implicit lh => new Impl)
-    aspects attach impl
+object PersonSql extends LoggingCompanion[PersonSql] {
+  def make[DB[_]: Monad: LiftConnectionIO: EmbeddableLogHandler]: PersonSql[DB] = {
+    EmbeddableLogHandler[DB].embedLift(implicit lh => new Impl)
   }
 
   final class Impl(implicit lh: LogHandler) extends PersonSql[ConnectionIO] {
@@ -117,25 +125,18 @@ object PersonSql {
         .query[Person]
         .option
   }
-
-  final class LoggingMid[DB[_]: Apply: Logging] extends PersonSql[Mid[DB, *]] {
-    def create(person: Person): Mid[DB, Unit]   = info"create person" *> _
-    def read(id: Long): Mid[DB, Option[Person]] = info"read person" *> _
-  }
 }
 
 // Department SQL algebra
-@derive(representableK)
+@derive(representableK, loggingMidTry)
 trait DeptSql[F[_]] {
   def create(dept: Dept): F[Unit]
   def read(id: Long): F[Option[Dept]]
 }
 
-object DeptSql {
-  def make[DB[_]: Monad: LiftConnectionIO: Logging: EmbeddableLogHandler]: DeptSql[DB] = {
-    val aspects = new LoggingMid[DB]
-    val impl    = EmbeddableLogHandler[DB].embedLift(implicit lh => new Impl)
-    aspects attach impl
+object DeptSql extends LoggingCompanion[DeptSql] {
+  def make[DB[_]: Monad: LiftConnectionIO: EmbeddableLogHandler]: DeptSql[DB] = {
+    EmbeddableLogHandler[DB].embedLift(implicit lh => new Impl)
   }
 
   final class Impl(implicit lh: LogHandler) extends DeptSql[ConnectionIO] {
@@ -146,37 +147,27 @@ object DeptSql {
         .query[Dept]
         .option
   }
-
-  final class LoggingMid[DB[_]: Apply: Logging] extends DeptSql[Mid[DB, *]] {
-    def create(dept: Dept): Mid[DB, Unit]     = info"create department" *> _
-    def read(id: Long): Mid[DB, Option[Dept]] = info"read departmTasknt" *> _
-  }
 }
 
 // Storage algebra encapsulates database transactional logic
-@derive(representableK)
+@derive(representableK, loggingMidTry)
 trait PersonStorage[F[_]] {
   def store(person: Person, dept: Dept): F[Unit]
 }
 
-object PersonStorage {
-  def make[F[_]: Apply: Logging, DB[_]: Monad: Txr[F, *[_]]](
+object PersonStorage extends LoggingCompanion[PersonStorage] {
+  def make[F[_]: Apply, DB[_]: Monad: Txr[F, *[_]]](
       persSql: PersonSql[DB],
       deptSql: DeptSql[DB]
   ): PersonStorage[F] = {
-    val aspects = new LoggingMid[F]
     val impl    = new Impl[DB](persSql, deptSql): PersonStorage[DB]
     val tx      = Txr[F, DB].trans
-    aspects attach impl.mapK(tx)
+    impl.mapK(tx)
   }
 
   final class Impl[DB[_]: Monad](persSql: PersonSql[DB], deptSql: DeptSql[DB]) extends PersonStorage[DB] {
     def store(person: Person, dept: Dept): DB[Unit] =
       deptSql.create(dept) >> persSql.create(person)
-  }
-
-  final class LoggingMid[F[_]: Apply: Logging] extends PersonStorage[Mid[F, *]] {
-    def store(person: Person, dept: Dept): Mid[F, Unit] = info"store dept & person" *> _
   }
 }
 
@@ -186,30 +177,30 @@ object TofuDoobieExample extends IOApp {
 
   def runF[I[_]: Effect: ContextShift, F[_]: Sync: UnliftIO](implicit WR: WithRun[F, I, Ctx]): I[Unit] = {
     // Simplified wiring below
-    implicit val loggingF = Logs.contextual[F, Ctx].byName("example")
+    implicit val loggingF = Logs.contextual[F, Ctx]
 
     val transactor   = Transactor.fromDriverManager[I](
       driver = "org.postgresql.Driver",
-      url = "jdbc:postgresql://localhost:5432/test",
+      url = "jdbc:postgresql://localhost:5432/postgres",
       user = "postgres",
       pass = "secret"
     )
     implicit val txr = Txr.continuational(transactor.mapK(WR.liftF))
 
     def initStorage[
-        DB[_]: Txr[F, *[_]]: Delay: Monad: Console: LiftConnectionIO: WithLocal[*[_], Ctx]: UnliftIO
+        DB[_]: Tries: Txr[F, *[_]]: Delay: Monad: Console: LiftConnectionIO: WithLocal[*[_], Ctx]: UnliftIO
     ]: PersonStorage[F] = {
-      implicit val loggingDB = Logs.contextual[DB, Ctx].byName("example")
+      implicit val loggingDB = Logs.contextual[DB, Ctx]
 
       implicit val elh = EmbeddableLogHandler.sync(tofuLogHandler[DB](Logging.Info))
 
-      val personSql = PersonSql.make[DB]
-      val deptSql   = DeptSql.make[DB]
+      val personSql = PersonSql.make[DB].attachErrLogs
+      val deptSql   = DeptSql.make[DB].attachErrLogs
 
-      PersonStorage.make(personSql, deptSql)
+      PersonStorage.make[F, DB](personSql, deptSql).attachErrLogs
     }
 
-    val storage = initStorage
+    val storage = initStorage[ConnectionCIO[F, *]]
     val program = storage.store(Person(13L, "Alex", 42L), Dept(42L, "Marketing"))
     val launch  = WR.runContext(program)(Ctx("715a-562a-4da5-a6e0"))
     launch
