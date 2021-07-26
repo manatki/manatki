@@ -7,6 +7,24 @@ import tofu.logging.LogRenderer
 import scala.{specialized => sp}
 import doobie.syntax.SqlInterpolator.SingleFragment
 import doobie.util.fragment.Fragment
+import tofu.logging.Logging
+import tofu.syntax.logging._
+import tofu.doobie.log.LogHandlerF
+import doobie.util.pos.Pos
+
+class AccumLoggable(values: Seq[LoggedValue]) extends LoggedValue {
+  override def shortName: String = "sql arguments"
+
+  override def toString = values.mkString("(", ", ", ")")
+
+  def logFields[I, V, @specialized R, @specialized M](input: I)(implicit r: LogRenderer[I, V, R, M]): R = {
+    values.foldLeft(r.noop(input)) { (res, p) => r.combine(res, p.logFields(input)) }
+  }
+}
+
+object AccumLoggable {
+  def apply(values: Seq[LoggedValue]): LoggedValue = new AccumLoggable(values)
+}
 
 case class Putain[A](value: A)(implicit val log: Loggable[A]) extends LoggedValue {
   def logFields[I, V, @sp(Unit) R, @sp M](input: I)(implicit r: LogRenderer[I, V, R, M]): R = log.fields(value, input)
@@ -29,7 +47,12 @@ object TofuSqlPart {
 
 object TDoobie {
   implicit class TofuSQLInterpolator(private val ctx: StringContext) extends AnyVal {
-    def tfsql(parts: TofuSqlPart*): Fragment =
+    def tfsql(parts: TofuSqlPart*)(implicit pos: Pos): Fragment =
       doobie.syntax.string.toSqlInterpolator(ctx).sql(parts.map(_.toFrag): _*)
+  }
+
+  def logHandler[F[_]: Logging](level: Logging.Level): LogHandlerF[F] = { evt =>
+    val args = evt.args.collect { case lv: LoggedValue => lv }
+    info"executing query ${evt.sql} with ${AccumLoggable(args)}"
   }
 }
