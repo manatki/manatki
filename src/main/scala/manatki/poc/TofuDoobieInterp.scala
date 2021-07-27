@@ -63,6 +63,8 @@ object AccumLoggable {
 case class Putain[A](value: A)(implicit val log: Loggable[A]) extends LoggedValue {
   def logFields[I, V, @sp(Unit) R, @sp M](input: I)(implicit r: LogRenderer[I, V, R, M]): R = log.fields(value, input)
   override def putValue[I, V, R, S](v: V)(implicit r: LogRenderer[I, V, R, S]): S           = log.putValue(value, v)
+
+  override def toString = log.logShow(value)
 }
 object Putain {
   implicit def put[A: Put]: Put[Putain[A]] = Put[A].contramap(_.value)
@@ -73,7 +75,7 @@ class TofuSqlPart(val fragment: Fragment) extends AnyVal {
 }
 
 object TofuSqlPart {
-  def apply[A](frag: SingleFragment[A]): TofuSqlPart                       = TofuSqlPart(frag.fr)
+  def apply[A](frag: SingleFragment[A]): TofuSqlPart                       = new TofuSqlPart(frag.fr)
   implicit def fromPut[A: Loggable: Put](a: A): TofuSqlPart                = TofuSqlPart(Putain(a))
   implicit def fromPutOption[A: Loggable: Put](oa: Option[A]): TofuSqlPart = TofuSqlPart(oa.map(Putain(_)))
   implicit def fromFragment(fr: Fragment): TofuSqlPart                     = TofuSqlPart(fr)
@@ -108,6 +110,7 @@ final case class Dept(id: Long, name: String)
 // Person SQL algebra
 @derive(representableK, loggingMidTry)
 trait PersonSql[F[_]] {
+  def init: F[Unit]
   def create(person: Person): F[Unit]
   def read(id: Long): F[Option[Person]]
 }
@@ -118,6 +121,8 @@ object PersonSql extends LoggingCompanion[PersonSql] {
   }
 
   final class Impl(implicit lh: LogHandler) extends PersonSql[ConnectionIO] {
+    def init: ConnectionIO[Unit]                     =
+      tfsql"create table if not exists person(id int8, name varchar(50), dept_id int8)".update.run.void
     def create(p: Person): ConnectionIO[Unit]        =
       tfsql"insert into person values(${p.id}, ${p.name}, ${p.deptId})".update.run.void
     def read(id: Long): ConnectionIO[Option[Person]] =
@@ -130,6 +135,7 @@ object PersonSql extends LoggingCompanion[PersonSql] {
 // Department SQL algebra
 @derive(representableK, loggingMidTry)
 trait DeptSql[F[_]] {
+  def init: F[Unit]
   def create(dept: Dept): F[Unit]
   def read(id: Long): F[Option[Dept]]
 }
@@ -140,6 +146,9 @@ object DeptSql extends LoggingCompanion[DeptSql] {
   }
 
   final class Impl(implicit lh: LogHandler) extends DeptSql[ConnectionIO] {
+
+    def init: ConnectionIO[Unit]                   =
+      tfsql"create table if not exists department(id int8, name varchar(50))".update.run.void
     def create(d: Dept): ConnectionIO[Unit]        =
       tfsql"insert into department values(${d.id}, ${d.name})".update.run.void
     def read(id: Long): ConnectionIO[Option[Dept]] =
@@ -152,6 +161,7 @@ object DeptSql extends LoggingCompanion[DeptSql] {
 // Storage algebra encapsulates database transactional logic
 @derive(representableK, loggingMidTry)
 trait PersonStorage[F[_]] {
+  def init: F[Unit]
   def store(person: Person, dept: Dept): F[Unit]
 }
 
@@ -160,12 +170,13 @@ object PersonStorage extends LoggingCompanion[PersonStorage] {
       persSql: PersonSql[DB],
       deptSql: DeptSql[DB]
   ): PersonStorage[F] = {
-    val impl    = new Impl[DB](persSql, deptSql): PersonStorage[DB]
-    val tx      = Txr[F, DB].trans
+    val impl = new Impl[DB](persSql, deptSql): PersonStorage[DB]
+    val tx   = Txr[F, DB].trans
     impl.mapK(tx)
   }
 
   final class Impl[DB[_]: Monad](persSql: PersonSql[DB], deptSql: DeptSql[DB]) extends PersonStorage[DB] {
+    def init: DB[Unit]                              = deptSql.init >> persSql.init
     def store(person: Person, dept: Dept): DB[Unit] =
       deptSql.create(dept) >> persSql.create(person)
   }
@@ -181,7 +192,7 @@ object TofuDoobieExample extends IOApp {
 
     val transactor   = Transactor.fromDriverManager[I](
       driver = "org.postgresql.Driver",
-      url = "jdbc:postgresql://localhost:5432/postgres",
+      url = "jdbc:h2:./test",
       user = "postgres",
       pass = "secret"
     )
@@ -201,7 +212,7 @@ object TofuDoobieExample extends IOApp {
     }
 
     val storage = initStorage[ConnectionCIO[F, *]]
-    val program = storage.store(Person(13L, "Alex", 42L), Dept(42L, "Marketing"))
+    val program = storage.init >> storage.store(Person(13L, "Alex", 42L), Dept(42L, "Marketing"))
     val launch  = WR.runContext(program)(Ctx("715a-562a-4da5-a6e0"))
     launch
   }

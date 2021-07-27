@@ -33,6 +33,7 @@ libraryDependencies += "com.github.julien-truffaut" %% "monocle-state"          
 libraryDependencies += "org.typelevel"              %% "simulacrum"              % Version.simulacrum
 libraryDependencies += "org.typelevel"              %% "spire"                   % Version.spire
 libraryDependencies += "com.lihaoyi"                %% "fastparse"               % Version.fastParse
+libraryDependencies += "org.tpolecat"               %% "doobie-h2"               % "0.12.1" // Postgres driver 42.2.19 + type mappings.
 libraryDependencies += "org.tpolecat"               %% "doobie-postgres"         % "0.12.1" // Postgres driver 42.2.19 + type mappings.
 
 //libraryDependencies += "ru.tinkoff"                 %% "tofu-optics-interop" % Version.tofu

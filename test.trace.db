@@ -1,0 +1,6 @@
+2021-07-27 09:40:37 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "DEPARTMENT" not found; SQL statement:
+insert into department values(?, ?) [42102-200]
+2021-07-27 09:47:40 jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Syntax error in SQL statement "CREATE IF[*] NOT EXISTS TABLE DEPARTMENT(ID INT8, NAME VARCHAR(50))"; expected "OR, FORCE, VIEW, ALIAS, SEQUENCE, USER, TRIGGER, ROLE, SCHEMA, CONSTANT, DOMAIN, TYPE, DATATYPE, AGGREGATE, LINKED, MEMORY, CACHED, LOCAL, GLOBAL, TEMP, TEMPORARY, TABLE, SYNONYM, PRIMARY, UNIQUE, HASH, SPATIAL, INDEX"; SQL statement:
+create if not exists table department(id int8, name varchar(50)) [42001-200]
