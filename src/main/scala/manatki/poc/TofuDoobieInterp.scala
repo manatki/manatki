@@ -193,8 +193,8 @@ object TofuDoobieExample extends IOApp {
     val transactor   = Transactor.fromDriverManager[I](
       driver = "org.postgresql.Driver",
       url = "jdbc:h2:./test",
-      user = "postgres",
-      pass = "secret"
+      user = "ca",
+      pass = ""
     )
     implicit val txr = Txr.continuational(transactor.mapK(WR.liftF))
 
