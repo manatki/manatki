@@ -191,7 +191,7 @@ object TofuDoobieExample extends IOApp {
     implicit val loggingF = Logs.contextual[F, Ctx]
 
     val transactor   = Transactor.fromDriverManager[I](
-      driver = "org.postgresql.Driver",
+      driver = "org.h2.Driver",
       url = "jdbc:h2:./test",
       user = "postgres",
       pass = "secret"

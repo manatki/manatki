@@ -34,7 +34,8 @@ libraryDependencies += "org.typelevel"              %% "simulacrum"             
 libraryDependencies += "org.typelevel"              %% "spire"                   % Version.spire
 libraryDependencies += "com.lihaoyi"                %% "fastparse"               % Version.fastParse
 libraryDependencies += "org.tpolecat"               %% "doobie-h2"               % "0.12.1" // Postgres driver 42.2.19 + type mappings.
-libraryDependencies += "org.tpolecat"               %% "doobie-postgres"         % "0.12.1" // Postgres driver 42.2.19 + type mappings.
+libraryDependencies += "org.tpolecat"               %% "doobie-postgres"         % "0.12.1"
+libraryDependencies += "org.codehaus.groovy"         % "groovy"                  % Version.groovy
 
 //libraryDependencies += "ru.tinkoff"                 %% "tofu-optics-interop" % Version.tofu
 //libraryDependencies += "io.higherkindness"          %% "droste-core"         % Version.droste

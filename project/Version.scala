@@ -42,12 +42,14 @@ object Version {
   val simulacrum = "1.0.0"
 
   val http4s = "0.21.4"
-  
+
   val spire = "0.17.0-M1"
 
   val circe = "0.13.0"
 
-  val fastParse   = "2.2.2"
+  val fastParse = "2.2.2"
 
   val derevo = "0.12.5"
+
+  val groovy = "3.0.6"
 }
