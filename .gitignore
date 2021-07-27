@@ -7,3 +7,4 @@ project/target
 metals.sbt
 .vscode
 .bsp
+*.db
