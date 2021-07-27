@@ -9,6 +9,7 @@ import cats.syntax.flatMap._
 import cats.syntax.functor._
 import cats.syntax.option._
 import fs2._
+import scala.annotation.nowarn
 
 package object fsfs {
   def zipWithHeader[F[_], A]: Pipe[F, A, (A, A)] =
@@ -44,6 +45,7 @@ package object fsfs {
           .echo
       }.stream
 
+    @nowarn
     final case class GBW[K, +V](inScope: Boolean = false, vals: Map[K, V] = Map.empty[K, V], include: Boolean = false)
 
     //requested by @curiosady in @scala_learn 20.02.2021 13:49 https://t.me/scala_learn/22768

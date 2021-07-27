@@ -31,6 +31,7 @@ import tofu.syntax.monadic._
 import tofu.{BracketThrow, Delay, Tries, WithContext, WithLocal, WithRun}
 
 import TDoobie._
+import doobie.util.log
 
 class AccumLoggable(values: Seq[LoggedValue]) extends LoggedValue {
   override def shortName: String = "sql arguments"
@@ -73,10 +74,18 @@ object TDoobie {
       doobie.syntax.string.toSqlInterpolator(ctx).sql(parts.map(_.toFrag): _*)
   }
 
-  def tofuLogHandler[F[_]: Logs.Universal](level: Logging.Level): LogHandlerF[F] = { evt =>
-    implicit val log = Logs[Id, F].named["doobie"]
-    val args         = evt.args.collect { case lv: LoggedValue => lv }
-    info"executing query ${evt.sql} with ${AccumLoggable(args)}"
+  def tofuLogHandler[F[_]: Logs.Universal](level: Logging.Level): LogHandlerF[F] = {
+    implicit val logs                        = Logs[Id, F].named["doobie"]
+    def args(evt: log.LogEvent): LoggedValue = AccumLoggable(evt.args.collect { case lv: LoggedValue => lv })
+
+    {
+      case evt: log.Success           =>
+        info"executed query ${evt.sql} with ${args(evt)}"
+      case evt: log.ExecFailure       =>
+        errorCause"failed query ${evt.sql} with ${args(evt)}" (evt.failure)
+      case evt: log.ProcessingFailure =>
+        errorCause"failed process query ${evt.sql} with ${args(evt)}" (evt.failure)
+    }
   }
 }
 
@@ -136,7 +145,7 @@ object DeptSql extends LoggingCompanion[DeptSql] {
     def init: ConnectionIO[Unit]                   =
       tfsql"create table if not exists department(id int8, name varchar(50))".update.run.void
     def create(d: Dept): ConnectionIO[Unit]        =
-      tfsql"insert into department values(${d.id}, ${d.name})".update.run.void
+      tfsql"insert into department valuez(${d.id}, ${d.name})".update.run.void
     def read(id: Long): ConnectionIO[Option[Dept]] =
       tfsql"select id, name from department where id = $id"
         .query[Dept]
@@ -177,8 +186,10 @@ object TofuDoobieExample extends IOApp {
     implicit val loggingF = Logs.contextual[F, Ctx]
 
     val transactor   = Transactor.fromDriverManager[I](
-      driver = "org.h2.Driver",
-      url = "jdbc:h2:./test",
+      // driver = "org.h2.Driver",
+      // url = "jdbc:h2:./test",
+      driver = "org.postgresql.Driver",
+      url = "jdbc:postgresql://localhost:5432/postgres",
       user = "postgres",
       pass = "secret"
     )
