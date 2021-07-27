@@ -1,50 +1,36 @@
 package manatki.poc
 
-import tofu.logging.Loggable
-import doobie.util.Put
-import tofu.logging.LoggedValue
-import tofu.logging.LogRenderer
 import scala.{specialized => sp}
-import doobie.syntax.SqlInterpolator.SingleFragment
-import doobie.util.fragment.Fragment
-import tofu.logging.Logging
-import tofu.syntax.logging._
-import tofu.doobie.log.LogHandlerF
-import doobie.util.pos.Pos
-import cats.effect.IOApp
 
-import cats.data.NonEmptyList
-import cats.effect.{ContextShift, Effect, ExitCode, Sync}
+import cats.data.{NonEmptyList, ReaderT}
+import cats.effect.{ContextShift, Effect, ExitCode, IO, IOApp, Sync}
 import cats.instances.string._
 import cats.tagless.syntax.functorK._
-import cats.{Apply, FlatMap, Monad}
+import cats.{Apply, FlatMap, Id, Monad}
 import derevo.derive
 import doobie._
 import doobie.implicits._
+import doobie.syntax.SqlInterpolator.SingleFragment
+import doobie.util.Put
+import doobie.util.fragment.Fragment
 import doobie.util.log.LogHandler
+import doobie.util.pos.Pos
 import tofu.common.Console
-import tofu.doobie.LiftConnectionIO
 import tofu.doobie.log.{EmbeddableLogHandler, LogHandlerF}
 import tofu.doobie.transactor.Txr
+import tofu.doobie.{ConnectionCIO, LiftConnectionIO}
 import tofu.higherKind.Mid
 import tofu.higherKind.derived.representableK
 import tofu.lift.UnliftIO
+import tofu.logging.derivation.{loggable, loggingMidTry}
+import tofu.logging.{LogRenderer, Loggable, LoggedValue, Logging, LoggingCompanion, Logs}
 import tofu.syntax.console._
 import tofu.syntax.context._
+import tofu.syntax.logging._
 import tofu.syntax.monadic._
-import tofu.{WithContext, WithLocal, WithRun}
-import cats.data.ReaderT
-import cats.effect.IO
-import tofu.logging.Logs
-import tofu.logging.derivation.loggable
-import tofu.Delay
-import tofu.Tries
+import tofu.{BracketThrow, Delay, Tries, WithContext, WithLocal, WithRun}
+
 import TDoobie._
-import tofu.BracketThrow
-import tofu.logging.derivation.loggingMidTry
-import tofu.logging.LoggingCompanion
-import cats.Id
-import tofu.doobie.ConnectionCIO
 
 class AccumLoggable(values: Seq[LoggedValue]) extends LoggedValue {
   override def shortName: String = "sql arguments"
