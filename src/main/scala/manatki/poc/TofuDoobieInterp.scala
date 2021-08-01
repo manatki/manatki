@@ -145,7 +145,7 @@ object DeptSql extends LoggingCompanion[DeptSql] {
     def init: ConnectionIO[Unit]                   =
       tfsql"create table if not exists department(id int8, name varchar(50))".update.run.void
     def create(d: Dept): ConnectionIO[Unit]        =
-      tfsql"insert into department valuez(${d.id}, ${d.name})".update.run.void
+      tfsql"insert into department values(${d.id}, ${d.name})".update.run.void
     def read(id: Long): ConnectionIO[Option[Dept]] =
       tfsql"select id, name from department where id = $id"
         .query[Dept]
@@ -191,7 +191,7 @@ object TofuDoobieExample extends IOApp {
       driver = "org.postgresql.Driver",
       url = "jdbc:postgresql://localhost:5432/postgres",
       user = "postgres",
-      pass = "secret"
+      pass = "tyunally"
     )
     implicit val txr = Txr.continuational(transactor.mapK(WR.liftF))
 
