@@ -20,7 +20,7 @@ sealed trait MemoData[+E, +A] {
 object MemoData {
   type MemoPromise[+E, +A] = IO[E, MemoData[E, A]]
   case object End                                                        extends MemoData[Nothing, Nothing]
-  case class Continue[R, E, A](chunk: Chunk[A], next: MemoPromise[E, A]) extends MemoData[E, A]
+  case class Continue[E, A](chunk: Chunk[A], next: MemoPromise[E, A]) extends MemoData[E, A]
 
 }
 
