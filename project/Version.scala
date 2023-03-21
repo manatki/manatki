@@ -29,7 +29,7 @@ object Version {
 
   val tofu = "0.10.3"
 
-  val zio = "1.0.13"
+  val zio = "2.0.3"
 
   val zioMacros = "0.6.2"
 

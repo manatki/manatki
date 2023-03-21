@@ -25,7 +25,6 @@ libraryDependencies += "tf.tofu"                    %% "tofu-logging-layout"    
 libraryDependencies += "tf.tofu"                    %% "tofu-derivation"         % Version.tofu
 libraryDependencies += "tf.tofu"                    %% "tofu-concurrent"         % Version.tofu
 libraryDependencies += "tf.tofu"                    %% "tofu-optics-macro"       % Version.tofu
-libraryDependencies += "tf.tofu"                    %% "tofu-zio-core"           % Version.tofu
 libraryDependencies += "tf.tofu"                    %% "tofu-doobie"             % Version.tofu
 libraryDependencies += "tf.tofu"                    %% "derevo-core"             % Version.derevo
 libraryDependencies += "com.github.julien-truffaut" %% "monocle-macro"           % Version.monocle
@@ -36,6 +35,7 @@ libraryDependencies += "com.lihaoyi"                %% "fastparse"              
 libraryDependencies += "org.tpolecat"               %% "doobie-h2"               % "0.12.1" // Postgres driver 42.2.19 + type mappings.
 libraryDependencies += "org.tpolecat"               %% "doobie-postgres"         % "0.12.1"
 libraryDependencies += "org.codehaus.groovy"         % "groovy"                  % Version.groovy
+libraryDependencies += "dev.zio" %% "zio" % Version.zio
 
 //libraryDependencies += "ru.tinkoff"                 %% "tofu-optics-interop" % Version.tofu
 //libraryDependencies += "io.higherkindness"          %% "droste-core"         % Version.droste
