@@ -117,17 +117,17 @@ object LamParser {
   import fastparse._
   import fastparse.ScalaWhitespace._
 
-  def name[_: P]        = P(CharIn("a-z", "A-Z") ~~ CharIn("a-z", "A-Z", "_'", "0-9").repX).!
-  def lambda[_: P]      =
+  def name[p: P]        = P(CharIn("a-z", "A-Z") ~~ CharIn("a-z", "A-Z", "_'", "0-9").repX).!
+  def lambda[p: P]      =
     P(CharIn("^λ") ~ name.rep(1) ~ "." ~ term)
       .map { case (names, body) => names.foldRight(body)(Lam.mk.lam) }
-  def variable[_: P]    = name.map(Lam.mk.vari)
-  def paren[_: P]       = P("(" ~ term ~ ")")
-  def simple[_: P]      = P(variable | paren)
-  def application[_: P] = simple.rep(1).map(_.reduce(Lam.mk.app))
+  def variable[p: P]    = name.map(Lam.mk.vari)
+  def paren[p: P]       = P("(" ~ term ~ ")")
+  def simple[p: P]      = P(variable | paren)
+  def application[p: P] = simple.rep(1).map(_.reduce(Lam.mk.app))
 
-  def term[_: P]: P[Lam.T] = P(application | lambda)
-  def wholeTerm[_: P]      = term ~ End
+  def term[p: P]: P[Lam.T] = P(application | lambda)
+  def wholeTerm[p: P]      = term ~ End
 
   def apply(s: String) = parse(s, wholeTerm(_)).get.value
 }

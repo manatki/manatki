@@ -5,7 +5,6 @@ import cats.{Contravariant, Distributive, Functor, Id}
 import manatki.data.tagless.Rep
 import simulacrum.typeclass
 import tofu.syntax.monadic._
-@typeclass
 trait Unwind[F[_]] {
   def unwind[R, A](f: R => F[A]): F[R => A]
 
@@ -26,8 +25,8 @@ trait Unwind[F[_]] {
 }
 
 object Unwind {
-
-  implicit val idUnwind: Unwind[Id] = new Unwind[Id] {
+  def apply[F[_]](implicit F: Unwind[F]): Unwind[F] = F
+  implicit val idUnwind: Unwind[Id]                 = new Unwind[Id] {
     def unwind[R, A](f: R => A): R => A = f
   }
 

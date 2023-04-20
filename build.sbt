@@ -2,7 +2,7 @@ name := "manatki"
 
 ThisBuild / version := "0.1"
 
-ThisBuild / scalaVersion := "2.13.6"
+ThisBuild / scalaVersion := "2.13.10"
 
 val akkas =
   (List("actor", "actor-typed", "stream").map(_ -> Version.akka) :+ ("http" -> Version.akkaHttp)).map {
@@ -29,7 +29,6 @@ libraryDependencies += "tf.tofu"                    %% "tofu-doobie"            
 libraryDependencies += "tf.tofu"                    %% "derevo-core"             % Version.derevo
 libraryDependencies += "com.github.julien-truffaut" %% "monocle-macro"           % Version.monocle
 libraryDependencies += "com.github.julien-truffaut" %% "monocle-state"           % Version.monocle
-libraryDependencies += "org.typelevel"              %% "simulacrum"              % Version.simulacrum
 libraryDependencies += "org.typelevel"              %% "spire"                   % Version.spire
 libraryDependencies += "com.lihaoyi"                %% "fastparse"               % Version.fastParse
 libraryDependencies += "org.tpolecat"               %% "doobie-h2"               % "0.12.1" // Postgres driver 42.2.19 + type mappings.

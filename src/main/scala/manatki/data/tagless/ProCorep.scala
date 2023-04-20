@@ -10,7 +10,7 @@ trait Rep[-P[_, _], A] {
   def apply[R](fa: P[A, R]): R
 }
 
-@typeclass trait PBase[P[_, _]]
+trait PBase[P[_, _]]
 object PBase {
   import tofu.syntax.monadic._
   type Extend1[X1, P[-i, +o], -I, +O]     = P[I, X1 => O]
@@ -37,7 +37,6 @@ object PBase {
     }
 }
 
-@typeclass
 trait LMap[P[_, _]] extends PBase[P] {
   def lmap[A, B, C](fab: P[A, B])(f: C => A): P[C, B]
 }
@@ -49,7 +48,6 @@ trait LMap[P[_, _]] extends PBase[P] {
   final def flipOut2[A, X1, X2, R](f: P[A, (X1, X2) => R])(x1: X1, x2: X2): P[A, R] = rmap(f)(_(x1, x2))
 }
 
-@typeclass
 trait Pro[P[_, _]] extends LMap[P] with RMap[P] { self =>
   def dimap[A, B, C, D](fab: P[A, B])(f: C => A)(g: B => D): P[C, D] = rmap(lmap(fab)(f))(g)
 }
@@ -78,7 +76,6 @@ object Rep {
   }
 }
 
-@typeclass
 trait ProCorep[P[_, _]] extends Pro[P] {
   type PR[A] = Rep[P, A]
 
@@ -103,9 +100,13 @@ trait ProCorep[P[_, _]] extends Pro[P] {
 
 object ProCorep {
   def construct[P[-_, _]](implicit P: ProCorep[P]): P[Layer[P], Layer[P]] = P.construct
+
+  implicit class Ops[A, B, P[_, _]](private val self: P[A, B]) extends AnyVal {
+    def zip[C, D](that: P[C, D])(implicit P: ProCorep[P]): P[(A, C), (B, D)] = P.zip(self, that)
+    def merge[C](that: P[A, C])(implicit P: ProCorep[P]): P[A, (B, C)]       = P.merge(self, that)
+  }
 }
 
-@typeclass
 trait ProTraverse[P[_, _]] extends ProCorep[P] {
   def prosequence[F[_], A, B](p: P[A, B])(implicit F: Applicative[F]): P[F[A], F[B]] =
     tabTraverse[F, F[A], A, F[B]](identity)(F.map(_)(_(p)))

@@ -1,7 +1,7 @@
 package manatki.data.tagless
 import manatki.data.tagless.data.ListP
 import tofu.syntax.monadic._
-import ProCorep.ops._
+import ProCorep.Ops
 
 class ListPSuite extends munit.FunSuite {
 
