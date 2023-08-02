@@ -19,22 +19,21 @@ libraryDependencies += "org.typelevel"              %% "alleycats-core"         
 libraryDependencies += "org.typelevel"              %% "cats-effect"             % Version.catsEffect
 libraryDependencies += "org.typelevel"              %% "cats-mtl-core"           % Version.catsMtl
 libraryDependencies += "org.typelevel"              %% "cats-tagless-macros"     % Version.catsTagless
-libraryDependencies += "tf.tofu"                    %% "tofu-core"               % Version.tofu
+libraryDependencies += "tf.tofu"                    %% "tofu-core-ce3"           % Version.tofu
 libraryDependencies += "tf.tofu"                    %% "tofu-logging-derivation" % Version.tofu
 libraryDependencies += "tf.tofu"                    %% "tofu-logging-layout"     % Version.tofu
 libraryDependencies += "tf.tofu"                    %% "tofu-derivation"         % Version.tofu
-libraryDependencies += "tf.tofu"                    %% "tofu-concurrent"         % Version.tofu
-libraryDependencies += "tf.tofu"                    %% "tofu-optics-macro"       % Version.tofu
-libraryDependencies += "tf.tofu"                    %% "tofu-doobie"             % Version.tofu
+libraryDependencies += "tf.tofu"                    %% "glass-macro"             % Version.glass
+libraryDependencies += "tf.tofu"                    %% "tofu-doobie-ce3"         % Version.tofu
 libraryDependencies += "tf.tofu"                    %% "derevo-core"             % Version.derevo
 libraryDependencies += "com.github.julien-truffaut" %% "monocle-macro"           % Version.monocle
 libraryDependencies += "com.github.julien-truffaut" %% "monocle-state"           % Version.monocle
 libraryDependencies += "org.typelevel"              %% "spire"                   % Version.spire
 libraryDependencies += "com.lihaoyi"                %% "fastparse"               % Version.fastParse
-libraryDependencies += "org.tpolecat"               %% "doobie-h2"               % "0.12.1" // Postgres driver 42.2.19 + type mappings.
-libraryDependencies += "org.tpolecat"               %% "doobie-postgres"         % "0.12.1"
+libraryDependencies += "org.tpolecat"               %% "doobie-h2"               % Version.doobie // Postgres driver 42.2.19 + type mappings.
+libraryDependencies += "org.tpolecat"               %% "doobie-postgres"         % Version.doobie
 libraryDependencies += "org.codehaus.groovy"         % "groovy"                  % Version.groovy
-libraryDependencies += "dev.zio" %% "zio" % Version.zio
+libraryDependencies += "dev.zio"                    %% "zio"                     % Version.zio
 
 //libraryDependencies += "ru.tinkoff"                 %% "tofu-optics-interop" % Version.tofu
 //libraryDependencies += "io.higherkindness"          %% "droste-core"         % Version.droste
@@ -67,7 +66,7 @@ lazy val akka = project.settings(libraryDependencies ++= akkas ++ circes)
 
 lazy val fsfs = project
   .settings(
-    libraryDependencies += "tf.tofu"    %% "tofu-core"     % Version.tofu,
+    libraryDependencies += "tf.tofu"    %% "tofu-core-ce3" % Version.tofu,
     libraryDependencies += ("co.fs2"    %% "fs2-io"        % Version.fs2) withSources (),
     libraryDependencies += "org.http4s" %% "http4s-server" % Version.http4s,
     plugins,
@@ -88,3 +87,6 @@ libraryDependencies ++= akkas.map(_ % "test")
 libraryDependencies += "org.scalameta" %% "munit" % "0.7.20" % Test
 
 libraryDependencies += "org.typelevel" %% "discipline-core" % Version.discipline
+
+
+evictionErrorLevel := util.Level.Warn

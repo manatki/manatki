@@ -3,7 +3,7 @@ object Version {
 
   val shapeless = "2.3.3"
 
-  val catsEffect = "2.2.0"
+  val catsEffect = "3.5.1"
 
   val catsMtl = "0.7.0"
 
@@ -17,7 +17,7 @@ object Version {
 
   val akkaHttp = "10.1.11"
 
-  val fs2 = "2.5.2"
+  val fs2 = "3.7.0"
 
   val droste = "0.8.0"
 
@@ -27,7 +27,9 @@ object Version {
 
   val scalaTestCheck = "3.1.0.0-RC2"
 
-  val tofu = "0.10.3"
+  val tofu = "0.12.0.1"
+
+  val glass = "0.2.1"
 
   val zio = "2.0.3"
 
@@ -41,7 +43,7 @@ object Version {
 
   val simulacrum = "1.0.0"
 
-  val http4s = "0.21.4"
+  val http4s = "0.23.22"
 
   val spire = "0.17.0-M1"
 
@@ -49,7 +51,9 @@ object Version {
 
   val fastParse = "2.2.2"
 
-  val derevo = "0.12.5"
+  val doobie = "1.0.0-RC4"
+
+  val derevo = "0.13.0"
 
   val groovy = "3.0.6"
 }
