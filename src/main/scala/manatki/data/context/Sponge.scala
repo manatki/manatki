@@ -1,8 +1,8 @@
 package manatki.data.context
 
-import tofu.optics.Contains
-import tofu.optics.Equivalent
-import tofu.optics.macros.GenEquivalent
+import glass.Contains
+import glass.Equivalent
+import glass.macros.GenEquivalent
 
 case class Sponge[F[C, _], Ctx[f[_]]](wrapped: Ctx[F[Sponge[F, Ctx], *]])
 

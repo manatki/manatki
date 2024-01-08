@@ -4,7 +4,7 @@ import tofu.higherKind.derived.representableK
 import cats.Functor
 import tofu.higherKind.RepresentableK
 import cats.Monad
-import tofu.concurrent.Atoms
+import tofu.concurrent.Atom
 import cats.kernel.Monoid
 import cats.~>
 import tofu.higherKind

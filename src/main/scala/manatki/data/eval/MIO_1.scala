@@ -1,6 +1,6 @@
 package manatki.data.eval
 
-import cats.effect.{Async, ExitCase, Sync}
+import cats.effect.{Async, Sync}
 import cats.kernel.Monoid
 import cats.{MonadError, StackSafeMonad}
 
@@ -117,19 +117,19 @@ object MIO_1 {
   implicit def calcInstance[R, S, E]: MIOAsyncInstance[R, S, E] = new MIOAsyncInstance[R, S, E]
 
   class MIOAsyncInstance[R, S, E]
-      extends cats.Defer[MIO_1[R, S, E, *]] with StackSafeMonad[MIO_1[R, S, E, *]] with Async[MIO_1[R, S, E, *]] {
+      extends StackSafeMonad[MIO_1[R, S, E, *]] {
     def suspend[A](fa: => MIO_1[R, S, E, A]): MIO_1[R, S, E, A]                          = MIO_1.defer(fa)
     def flatMap[A, B](fa: MIO_1[R, S, E, A])(f: A => MIO_1[R, S, E, B]): MIO_1[R, S, E, B] = fa.flatMap(f)
     def pure[A](x: A): MIO_1[R, S, E, A]                                               = MIO_1.pure(x)
 
-    def bracketCase[A, B](acquire: MIO_1[R, S, E, A])(use: A => MIO_1[R, S, E, B])(
-        release: (A, ExitCase[Throwable]) => MIO_1[R, S, E, Unit]): MIO_1[R, S, E, B] =
-      acquire.flatMap(
-        a =>
-          use(a).cont(
-            b => release(a, ExitCase.Completed) as b,
-            e => release(a, ExitCase.Error(MIOExcept(e))) *> raise(e)
-        ))
+//    def bracketCase[A, B](acquire: MIO_1[R, S, E, A])(use: A => MIO_1[R, S, E, B])(
+//        release: (A, ExitCase[Throwable]) => MIO_1[R, S, E, Unit]): MIO_1[R, S, E, B] =
+//      acquire.flatMap(
+//        a =>
+//          use(a).cont(
+//            b => release(a, ExitCase.Completed) as b,
+//            e => release(a, ExitCase.Error(MIOExcept(e))) *> raise(e)
+//        ))
 
     def raiseError[A](e: Throwable): MIO_1[R, S, E, A] = delay(throw e)
 

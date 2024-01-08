@@ -1,7 +1,6 @@
 package manatki.data.eval
 
 import cats.data.{IndexedState, State}
-import cats.effect.ExitCase
 import cats.evidence.Is
 import cats.{Functor, Monad, MonadError, Monoid, StackSafeMonad}
 import manatki.free.FunK
@@ -266,7 +265,7 @@ object CalcT {
 
   class CalcFunctorInstance[F[+_], R, S, O, E]
       extends MonadError[CalcT[F, R, S, O, E, *], E] with cats.Defer[CalcT[F, R, S, O, E, *]]
-      with StackSafeMonad[CalcT[F, R, S, O, E, *]] with cats.effect.Bracket[CalcT[F, R, S, O, E, *], E] {
+      with StackSafeMonad[CalcT[F, R, S, O, E, *]] {
     def defer[A](fa: => CalcT[F, R, S, O, E, A]): CalcT[F, R, S, O, E, A] = CalcT.defer(fa)
     def raiseError[A](e: E): CalcT[F, R, S, O, E, A]                      = CalcT.raise(e)
     def handleErrorWith[A](
@@ -276,18 +275,18 @@ object CalcT {
     def flatMap[A, B](fa: CalcT[F, R, S, O, E, A])(f: A => CalcT[F, R, S, O, E, B]): CalcT[F, R, S, O, E, B] =
       fa.flatMap(f)
     def pure[A](x: A): CalcT[F, R, S, O, E, A] = CalcT.pure(x)
-    def bracketCase[A, B](
-        acquire: CalcT[F, R, S, O, E, A]
-    )(
-        use: A => CalcT[F, R, S, O, E, B]
-    )(release: (A, ExitCase[E]) => CalcT[F, R, S, O, E, Unit]): CalcT[F, R, S, O, E, B] =
-      acquire.flatMap { a =>
-        use(a).bind(new Continue[F, O, E, B, R, S, O, E, B] {
-          def success(result: B): CalcT[F, R, S, O, E, B]                               = release(a, ExitCase.Completed).as(result)
-          def error(err: E): CalcT[F, R, S, O, E, B]                                    = release(a, ExitCase.Error(err)) >> CalcT.raise(err)
-          def output(out: O): CalcT[F, R, S, O, E, SinkStep[F, O, E, B, R, S, O, E, B]] = Output(out, Pure(this))
-        })
-      }
+//    def bracketCase[A, B](
+//        acquire: CalcT[F, R, S, O, E, A]
+//    )(
+//        use: A => CalcT[F, R, S, O, E, B]
+//    )(release: (A, ExitCase[E]) => CalcT[F, R, S, O, E, Unit]): CalcT[F, R, S, O, E, B] =
+//      acquire.flatMap { a =>
+//        use(a).bind(new Continue[F, O, E, B, R, S, O, E, B] {
+//          def success(result: B): CalcT[F, R, S, O, E, B]                               = release(a, ExitCase.Completed).as(result)
+//          def error(err: E): CalcT[F, R, S, O, E, B]                                    = release(a, ExitCase.Error(err)) >> CalcT.raise(err)
+//          def output(out: O): CalcT[F, R, S, O, E, SinkStep[F, O, E, B, R, S, O, E, B]] = Output(out, Pure(this))
+//        })
+//      }
   }
 }
 

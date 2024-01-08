@@ -1,8 +1,7 @@
 package manatki.data
-import cats.effect.{Concurrent, Sync}
-import cats.effect.concurrent.{Ref, Semaphore}
+import cats.effect.std.Semaphore
+import cats.effect.{Async, Concurrent, Ref, Sync}
 import cats.implicits._
-import cats.~>
 
 final case class Quirill[F[_]: Sync, A] private (lock: Semaphore[F], items: Ref[F, Vector[A]]) {
   private def put(item: A) = items.update(_ :+ item)
@@ -16,8 +15,8 @@ final case class Quirill[F[_]: Sync, A] private (lock: Semaphore[F], items: Ref[
 }
 
 object Quirill {
-  def create[F[_]: Concurrent, A](size: Int): F[Quirill[F, A]] = createIn[F, F, A](size)
+  def create[F[_]: Async, A](size: Int): F[Quirill[F, A]] = createIn[F, F, A](size)
 
-  def createIn[I[_]: Sync, F[_]: Concurrent, A](size: Int): I[Quirill[F, A]] =
+  def createIn[I[_]: Sync, F[_]: Async, A](size: Int): I[Quirill[F, A]] =
     Semaphore.in[I, F](size).map2(Ref.in[I, F, Vector[A]](Vector.empty))(apply(_, _))
 }

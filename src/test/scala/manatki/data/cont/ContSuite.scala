@@ -13,7 +13,6 @@ import cats.syntax.applicative._
 import cats.syntax.monoid._
 import cats.syntax.foldable._
 import ContE.{reset, resetS, shift, shiftS}
-import org.scalatest.FlatSpec
 import Monoid.empty
 import org.scalatest.concurrent.TimeLimitedTests
 import org.scalatest.time.{Second, Span}

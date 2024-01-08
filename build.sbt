@@ -2,7 +2,7 @@ name := "manatki"
 
 ThisBuild / version := "0.1"
 
-ThisBuild / scalaVersion := "2.13.10"
+ThisBuild / scalaVersion := "2.13.11"
 
 val akkas =
   (List("actor", "actor-typed", "stream").map(_ -> Version.akka) :+ ("http" -> Version.akkaHttp)).map {
@@ -76,6 +76,7 @@ lazy val fsfs = project
 lazy val problems = project
   .dependsOn(manatki)
   .settings(plugins)
+  .settings(scalacOptions += "-Xlint:strict-unsealed-patmat")
   .settings(testSettings)
 
 lazy val manatki = project.in(file(".")).settings(plugins)
@@ -84,9 +85,9 @@ testSettings
 
 libraryDependencies ++= akkas.map(_ % "test")
 
-libraryDependencies += "org.scalameta" %% "munit" % "0.7.20" % Test
+libraryDependencies += "org.scalameta" %% "munit" % "0.7.29" % Test
 
 libraryDependencies += "org.typelevel" %% "discipline-core" % Version.discipline
 
 
-evictionErrorLevel := util.Level.Warn
+ThisBuild / evictionErrorLevel  := util.Level.Warn

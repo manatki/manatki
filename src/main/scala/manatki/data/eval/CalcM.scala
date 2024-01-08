@@ -2,11 +2,10 @@ package manatki.data.eval
 
 import CalcMSpecials._
 import cats.data.IndexedState
-import cats.effect.ExitCase
 import cats.evidence.Is
 import cats.{Functor, Monad, MonadError, Monoid, StackSafeMonad}
 import manatki.free.FunK
-import tofu.optics.PContains
+import glass.PContains
 
 import scala.annotation.tailrec
 
@@ -216,7 +215,7 @@ object CalcM {
 
   class CalcFunctorInstance[F[+_], R, S, E]
       extends MonadError[CalcM[F, R, S, S, E, *], E] with cats.Defer[CalcM[F, R, S, S, E, *]]
-      with StackSafeMonad[CalcM[F, R, S, S, E, *]] with cats.effect.Bracket[CalcM[F, R, S, S, E, *], E] {
+      with StackSafeMonad[CalcM[F, R, S, S, E, *]]  {
     def defer[A](fa: => CalcM[F, R, S, S, E, A]): CalcM[F, R, S, S, E, A] = CalcM.defer(fa)
     def raiseError[A](e: E): CalcM[F, R, S, S, E, A]                      = CalcM.raise(e)
     def handleErrorWith[A](fa: CalcM[F, R, S, S, E, A])(f: E => CalcM[F, R, S, S, E, A]): CalcM[F, R, S, S, E, A] =
@@ -224,17 +223,17 @@ object CalcM {
     def flatMap[A, B](fa: CalcM[F, R, S, S, E, A])(f: A => CalcM[F, R, S, S, E, B]): CalcM[F, R, S, S, E, B] =
       fa.flatMap(f)
     def pure[A](x: A): CalcM[F, R, S, S, E, A] = CalcM.pure(x)
-    def bracketCase[A, B](
-        acquire: CalcM[F, R, S, S, E, A]
-    )(
-        use: A => CalcM[F, R, S, S, E, B]
-    )(release: (A, ExitCase[E]) => CalcM[F, R, S, S, E, Unit]): CalcM[F, R, S, S, E, B] =
-      acquire.flatMap { a =>
-        use(a).bind(new Continue[B, E, CalcM[F, R, S, S, E, B]] {
-          def success(b: B): CalcM[F, R, S, S, E, B] = release(a, ExitCase.Completed).as(b)
-          def error(e: E): CalcM[F, R, S, S, E, B]   = release(a, ExitCase.Error(e)) >> CalcM.raise(e)
-        })
-      }
+//    def bracketCase[A, B](
+//        acquire: CalcM[F, R, S, S, E, A]
+//    )(
+//        use: A => CalcM[F, R, S, S, E, B]
+//    )(release: (A, ExitCase[E]) => CalcM[F, R, S, S, E, Unit]): CalcM[F, R, S, S, E, B] =
+//      acquire.flatMap { a =>
+//        use(a).bind(new Continue[B, E, CalcM[F, R, S, S, E, B]] {
+//          def success(b: B): CalcM[F, R, S, S, E, B] = release(a, ExitCase.Completed).as(b)
+//          def error(e: E): CalcM[F, R, S, S, E, B]   = release(a, ExitCase.Error(e)) >> CalcM.raise(e)
+//        })
+//      }
   }
 }
 

@@ -6,7 +6,7 @@
 // import tofu.higherKind.derived.ContextEmbed
 // import tofu.higherKind.derived.representableB
 // import tofu.higherKind.derived.representableK
-// import tofu.optics.macros.ClassyOptics
+// import glass.macros.ClassyOptics
 // import zio.TaskManaged
 // import zio.URIO
 // import zio.ZIO
@@ -21,8 +21,8 @@
 // import tofu.bi.TwinContext
 // import zio.interop.catz.monadErrorInstance
 // import tofu.zioInstances.implicits._
-// import tofu.optics.Contains
-// import tofu.optics.Extract
+// import glass.Contains
+// import glass.Extract
 // import tofu.bi.BiContext
 
 // sealed trait Error

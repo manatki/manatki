@@ -2,10 +2,9 @@ package manatki.data.eval
 
 
 import cats.data.IndexedState
-import cats.effect.ExitCase
 import cats.{MonadError, Monoid, StackSafeMonad}
-import tofu.optics.PContains
-import tofu.optics.PContains
+import glass.PContains
+import glass.PContains
 
 sealed trait Calc[-R, -S1, +S2, +E, +A] {
   final def run(r: R, init: S1): (S2, Either[E, A]) = Calc.run(this, r, init)
@@ -131,20 +130,20 @@ object Calc {
 
   class CalcFunctorInstance[R, S, E]
     extends MonadError[Calc[R, S, S, E, *], E] with cats.Defer[Calc[R, S, S, E, *]]
-      with StackSafeMonad[Calc[R, S, S, E, *]] with cats.effect.Bracket[Calc[R, S, S, E, *], E] {
+      with StackSafeMonad[Calc[R, S, S, E, *]]{
     def defer[A](fa: => Calc[R, S, S, E, A]): Calc[R, S, S, E, A]                                     = Calc.defer(fa)
     def raiseError[A](e: E): Calc[R, S, S, E, A]                                                      = Calc.raise(e)
     def handleErrorWith[A](fa: Calc[R, S, S, E, A])(f: E => Calc[R, S, S, E, A]): Calc[R, S, S, E, A] = fa.handleWith(f)
     def flatMap[A, B](fa: Calc[R, S, S, E, A])(f: A => Calc[R, S, S, E, B]): Calc[R, S, S, E, B]      = fa.flatMap(f)
     def pure[A](x: A): Calc[R, S, S, E, A]                                                            = Calc.pure(x)
-    def bracketCase[A, B](
-      acquire: Calc[R, S, S, E, A]
-    )(use: A => Calc[R, S, S, E, B])(release: (A, ExitCase[E]) => Calc[R, S, S, E, Unit]): Calc[R, S, S, E, B] =
-      acquire.flatMap { a =>
-        use(a).cont(
-          b => release(a, ExitCase.Completed).as(b),
-          e => release(a, ExitCase.Error(e)) >> Calc.raise(e)
-        )
-      }
+//    def bracketCase[A, B](
+//      acquire: Calc[R, S, S, E, A]
+//    )(use: A => Calc[R, S, S, E, B])(release: (A, ExitCase[E]) => Calc[R, S, S, E, Unit]): Calc[R, S, S, E, B] =
+//      acquire.flatMap { a =>
+//        use(a).cont(
+//          b => release(a, ExitCase.Completed).as(b),
+//          e => release(a, ExitCase.Error(e)) >> Calc.raise(e)
+//        )
+//      }
   }
 }

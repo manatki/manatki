@@ -3,7 +3,6 @@ package manatki.control
 import cats.data.{EitherK, Tuple2K}
 import cats.{Contravariant, Distributive, Functor, Id}
 import manatki.data.tagless.Rep
-import simulacrum.typeclass
 import tofu.syntax.monadic._
 trait Unwind[F[_]] {
   def unwind[R, A](f: R => F[A]): F[R => A]

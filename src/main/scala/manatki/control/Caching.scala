@@ -2,7 +2,7 @@ package manatki.control
 import cats.{Functor, Monad}
 import cats.data.{OptionT, Tuple2K}
 import cats.effect.Sync
-import cats.effect.concurrent.Ref
+import cats.effect.Ref
 import cats.tagless.ApplyK
 import cats.tagless.syntax.semigroupalK._
 import cats.tagless.syntax.functorK._

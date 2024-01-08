@@ -3,10 +3,8 @@ import cats.arrow.FunctionK
 import cats.tagless.FunctorK
 import cats.{Applicative, ~>}
 import manatki.syntax.funK
-import simulacrum.typeclass
 import tofu.higherKind.RepK
 
-@typeclass
 trait ProK[P[-_[_], +_[_]]] {
   def leftMapK[I[_], J[_], O[_]](pio: P[I, O])(fk: J ~> I): P[J, O]
   def rightMapK[I[_], O[_], Q[_]](pio: P[I, O])(fk: O ~> Q): P[I, Q]
@@ -15,7 +13,6 @@ trait ProK[P[-_[_], +_[_]]] {
     leftMapK(rightMapK(pio)(foq))(fji)
 }
 
-@typeclass
 trait ProCorepK[P[_[_], _[_]]] extends ProK[P] {
   def tabulateK[I[_], O[_]](hom: RepK[P[I, *[_]], *] ~> O): P[I, O]
 
@@ -37,7 +34,6 @@ object ProCorepK {
     tabulateK[P, Platform[P, *], Platform[P, *]](funK(f => Platform[P](f(_))))
 }
 
-@typeclass
 trait ProTraverseK[P[_[_], _[_]]] extends ProCorepK[P] {
   def proTraverseK[F[_]: Applicative, I[_], O[_]](pio: P[I, O]): P[λ[a => F[I[a]]], λ[a => F[O[a]]]]
 }

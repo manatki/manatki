@@ -2,7 +2,7 @@ package manatki.poc.multiDomain
 import cats.Id
 import cats.data.ReaderT
 import cats.effect.IO
-import cats.effect.concurrent.Ref
+import cats.effect.Ref
 import cats.implicits._
 import manatki.poc.multiDomain.FileSystem._
 

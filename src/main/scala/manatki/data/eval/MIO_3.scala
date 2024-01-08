@@ -1,7 +1,7 @@
 package manatki.data.eval
 
 import cats.StackSafeMonad
-import cats.effect.{Async, ExitCase}
+import cats.effect.{Async}
 import cats.evidence.As
 import cats.kernel.Monoid
 import cats.syntax.apply._
@@ -170,23 +170,23 @@ object MIO_3 {
   implicit def calcInstance[R, S, E]: MIOAsyncInstance[R, S, E] = new MIOAsyncInstance[R, S, E]
 
   class MIOAsyncInstance[R, S, E]
-      extends cats.Defer[MIO_3[R, S, S, E, *]] with StackSafeMonad[MIO_3[R, S, S, E, *]] with Async[MIO_3[R, S, S, E, *]] {
+      extends StackSafeMonad[MIO_3[R, S, S, E, *]] {
     def suspend[A](fa: => MIO_3[R, S, S, E, A]): MIO_3[R, S, S, E, A]                             = MIO_3.defer(fa)
     def flatMap[A, B](fa: MIO_3[R, S, S, E, A])(f: A => MIO_3[R, S, S, E, B]): MIO_3[R, S, S, E, B] = fa.flatMap(f)
     def pure[A](x: A): MIO_3[R, S, S, E, A]                                                     = MIO_3.pure(x)
 
-    def bracketCase[A, B](acquire: MIO_3[R, S, S, E, A])(use: A => MIO_3[R, S, S, E, B])(
-        release: (A, ExitCase[Throwable]) => MIO_3[R, S, S, E, Unit]): MIO_3[R, S, S, E, B] =
-      (acquire, info[R, S]).tupled.flatMap {
-        case (a, (r, s, ec)) =>
-          Catch(
-            e => run(release(a, ExitCase.Error(e)), r, s, Callback.empty)(ec),
-            use(a).cont(
-              b => release(a, ExitCase.Completed) as b,
-              e => release(a, ExitCase.Error(MIOExcept(e))) *> raise(e)
-            )
-          )
-      }
+//    def bracketCase[A, B](acquire: MIO_3[R, S, S, E, A])(use: A => MIO_3[R, S, S, E, B])(
+//        release: (A, ExitCase[Throwable]) => MIO_3[R, S, S, E, Unit]): MIO_3[R, S, S, E, B] =
+//      (acquire, info[R, S]).tupled.flatMap {
+//        case (a, (r, s, ec)) =>
+//          Catch(
+//            e => run(release(a, ExitCase.Error(e)), r, s, Callback.empty)(ec),
+//            use(a).cont(
+//              b => release(a, ExitCase.Completed) as b,
+//              e => release(a, ExitCase.Error(MIOExcept(e))) *> raise(e)
+//            )
+//          )
+//      }
 
     def raiseError[A](e: Throwable): MIO_3[R, S, S, E, A] = delay(throw e)
 

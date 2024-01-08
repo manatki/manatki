@@ -3,7 +3,6 @@ import cats.arrow.FunctionK
 import cats.free.{Cofree, Free}
 import cats.{Eval, Functor, Id, ~>}
 import manatki.data.day.{Day, DayClosure, FunctionD2}
-import simulacrum.typeclass
 import tofu.syntax.funk.{funK, funKFrom}
 import tofu.syntax.monadic._
 import cats.Monad
@@ -13,13 +12,11 @@ import manatki.data.tagless.HFree.Bind
 import manatki.data.tagless.HFree.HBind
 import tofu.data.FunK
 
-@typeclass
 trait HFunctor[U[_[_], _]] {
   implicit def functor[F[_]: Functor]: Functor[U[F, *]]
   def hmap[F[_]: Functor, G[_]: Functor, A](ufa: U[F, A])(fk: F ~> G): U[G, A]
 }
 
-@typeclass
 trait DSemigroupal[U[_[_], _]] extends HFunctor[U] {
   def dmap2[F[_]: Functor, G[_]: Functor, H[_]: Functor, A, X, Y](fx: U[F, X], gy: U[G, Y])(xya: (X, Y) => Eval[A])(
       f: FunctionD2[F, G, H]
@@ -37,11 +34,11 @@ trait DSemigroupal[U[_[_], _]] extends HFunctor[U] {
     dmap2(hf, uf)((f, a) => Eval.later(f(a)))(FunctionD2[DayClosure[F, G, *], F]((fgx, fx, f) => fgx(fx)(f)))
 }
 
-@typeclass trait HPoint[U[_[_], _]] {
+ trait HPoint[U[_[_], _]] {
   def hpoint[A](a: A): U[Id, A]
 }
 
-@typeclass trait HPure[U[_[_], _]] extends HPoint[U] {
+ trait HPure[U[_[_], _]] extends HPoint[U] {
   def hpure[F[_]: Functor, A](fa: F[A]): U[F, A]
 
   def hpuref[F[_]: Functor, A]: F ~> U[F, *] = funK(hpure(_))
@@ -49,18 +46,18 @@ trait DSemigroupal[U[_[_], _]] extends HFunctor[U] {
   override def hpoint[A](a: A): U[Id, A] = hpure[Id, A](a)
 }
 
-@typeclass trait DMonoidal[U[_[_], _]] extends DSemigroupal[U] with HPoint[U] {
+ trait DMonoidal[U[_[_], _]] extends DSemigroupal[U] with HPoint[U] {
   override def hmap[F[_]: Functor, G[_]: Functor, A](ufa: U[F, A])(fk: F ~> G): U[G, A] =
     dmap2(ufa, hpoint[Unit](()))((a, _) => Eval.now(a))(FunctionD2[F, Id]((fa, b, f) => fk(fa).map(f(_, b).value)))
 }
 
-@typeclass trait HFlatMap[U[_[_], _]] extends HFunctor[U] {
+ trait HFlatMap[U[_[_], _]] extends HFunctor[U] {
   def hflatten[F[_]: Functor, A](uuf: U[U[F, *], A]): U[F, A] = hflatMap(uuf)(FunctionK.id)
 
   def hflatMap[F[_]: Functor, G[_]: Functor, A](tfa: U[F, A])(t: F ~> U[G, *]): U[G, A]
 }
 
-@typeclass trait HMonad[U[_[_], _]] extends HFlatMap[U] with HPure[U] {
+ trait HMonad[U[_[_], _]] extends HFlatMap[U] with HPure[U] {
   override def hmap[F[_]: Functor, G[_]: Functor, A](ufa: U[F, A])(fk: F ~> G): U[G, A] =
     hflatMap(ufa)(funK(fx => hpure(fk(fx))))
 }
@@ -74,7 +71,7 @@ object HMonad {
     def hflatMap[F[_]: Functor, G[_]: Functor, A](tfa: Free[F, A])(t: F ~> Free[G, *]): Free[G, A] = tfa.foldMap(t)
   }
 }
-@typeclass trait DFlatMap[U[_[_], _]] extends HFlatMap[U] {
+ trait DFlatMap[U[_[_], _]] extends HFlatMap[U] {
   override def hflatMap[F[_]: Functor, G[_]: Functor, A](tfa: U[F, A])(t: F ~> U[G, *]): U[G, A] =
     dflatMap(tfa, DayClosure.fromTrans(t)(()))((a, _) => Eval.now(a))
 
@@ -84,7 +81,7 @@ object HMonad {
 }
 
 // Tensorial (day) strong monad
-@typeclass trait DMonad[U[_[_], _]] extends DFlatMap[U] with DMonoidal[U] with HMonad[U] {
+ trait DMonad[U[_[_], _]] extends DFlatMap[U] with DMonoidal[U] with HMonad[U] {
   def strength[F[_]: Functor, G[_]: Functor, A](d: Day[F, U[G, *], A]): U[Day[F, G, *], A] =
     dflatMap[G, Day[F, G, *], d.Y, d.X, A](d.gy, DayClosure.mk((gy, f) => hpure(Day(d.fx, gy)(f))))((y, x) =>
       d.run(x, y)

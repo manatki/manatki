@@ -2,7 +2,6 @@ package manatki.data.tagless
 import cats.{Applicative, Functor, Id, Traverse}
 import manatki.data.tagless.ProTraverse.Tab
 import manatki.data.tagless.ProTraverseMakers.TabPure
-import simulacrum.typeclass
 
 import scala.annotation.unchecked.{uncheckedVariance => uv}
 
@@ -41,7 +40,7 @@ trait LMap[P[_, _]] extends PBase[P] {
   def lmap[A, B, C](fab: P[A, B])(f: C => A): P[C, B]
 }
 
-@typeclass trait RMap[P[_, _]] extends PBase[P] {
+trait RMap[P[_, _]] extends PBase[P] {
   def rmap[A, B, C](fab: P[A, B])(f: B => C): P[A, C]
 
   final def flipOut[A, X1, R](f: P[A, X1 => R])(x1: X1): P[A, R]                    = rmap(f)(_(x1))

@@ -2,7 +2,7 @@ package manatki.data.tagless
 
 import cats.free.Free
 import manatki.data.tagless.HTFreer.{HTBind, HTLiftBind, HTLiftLift, HTLiftPure, HTPure}
-import tofu.optics.data.Identity
+import glass.data.Identity
 
 import scala.annotation.tailrec
 
