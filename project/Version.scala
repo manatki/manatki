@@ -1,7 +1,7 @@
 object Version {
   val cats = "2.9.0"
 
-  val shapeless = "2.3.10"
+  val shapeless = "2.4.0-M1"
 
   val catsEffect = "3.5.1"
 
@@ -35,7 +35,7 @@ object Version {
 
   val zioMacros = "0.6.2"
 
-  val kindProjector = "0.13.2"
+  val kindProjector = "0.13.3"
 
   val bm4 = "0.3.0"
 

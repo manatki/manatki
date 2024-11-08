@@ -2,7 +2,7 @@ name := "manatki"
 
 ThisBuild / version := "0.1"
 
-ThisBuild / scalaVersion := "2.13.11"
+ThisBuild / scalaVersion := "2.13.13"
 
 val akkas =
   (List("actor", "actor-typed", "stream").map(_ -> Version.akka) :+ ("http" -> Version.akkaHttp)).map {
